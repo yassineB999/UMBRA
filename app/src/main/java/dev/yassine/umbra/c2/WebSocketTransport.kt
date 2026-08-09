@@ -49,7 +49,7 @@ class WebSocketTransport(
     private var deviceId: String = ""
 
     @Serializable
-    data class Hello(val type: String = "register", val device_id: String, val info: String = "{}")
+    data class Hello(val type: String, val device_id: String, val info: String = "{}")
 
     fun connect(imei: String) {
         deviceId = imei
@@ -78,7 +78,7 @@ class WebSocketTransport(
                 connected = true
                 reconnectDelay = INITIAL_RECONNECT_DELAY
                 onStatus("connected")
-                val hello = json.encodeToString(Hello(device_id = deviceId))
+                val hello = json.encodeToString(Hello(type = "register", device_id = deviceId))
                 ws.send(hello)
             }
 
