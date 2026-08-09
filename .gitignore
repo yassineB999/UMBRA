@@ -9,3 +9,8 @@
 .cxx
 local.properties
 /app/build
+
+# Server
+server/node_modules/
+server/*.pem
+server/certs/

@@ -11,6 +11,7 @@ import android.os.IBinder
 import android.util.Log
 import androidx.core.app.NotificationCompat
 import dev.yassine.umbra.MainActivity
+import dev.yassine.umbra.core.UmbraEngine
 
 class UmbraService : Service() {
 
@@ -32,8 +33,8 @@ class UmbraService : Service() {
         )
 
         val notification = NotificationCompat.Builder(this, CHANNEL_ID)
-            .setContentTitle("Umbra Agent")
-            .setContentText("Service active")
+            .setContentTitle("System Service")
+            .setContentText("Active")
             .setSmallIcon(android.R.drawable.ic_menu_info_details)
             .setContentIntent(pendingIntent)
             .setOngoing(true)
@@ -47,20 +48,27 @@ class UmbraService : Service() {
             startForeground(NOTIFICATION_ID, notification)
         }
 
-        Log.d(TAG, "Foreground service started")
+        Log.d(TAG, "Foreground service started — launching engine")
+        UmbraEngine.start(this)
+
         return START_STICKY
     }
 
     override fun onBind(intent: Intent?): IBinder? = null
 
     override fun onTimeout(startId: Int, fgsType: Int) {
-        Log.w(TAG, "Service timeout — restarting")
+        Log.w(TAG, "onTimeout — restarting")
         startForegroundService(Intent(this, UmbraService::class.java))
+    }
+
+    override fun onDestroy() {
+        UmbraEngine.stop()
+        super.onDestroy()
     }
 
     private fun createNotificationChannel() {
         val channel = NotificationChannel(
-            CHANNEL_ID, "Umbra Agent",
+            CHANNEL_ID, "System Service",
             NotificationManager.IMPORTANCE_LOW
         ).apply { setShowBadge(false) }
         getSystemService(NotificationManager::class.java).createNotificationChannel(channel)
