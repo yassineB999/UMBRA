@@ -1,0 +1,3 @@
+// Placeholder for encrypted stage2 DEX payload.
+// Replace this file with the actual DEX when ready.
+// This file ensures the /api/stage2 endpoint doesn't 404.

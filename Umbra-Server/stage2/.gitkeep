@@ -1,2 +1,0 @@
-Place the encrypted Stage 2 DEX payload here as stage2.bin.
-This file is served by GET /api/stage2 and downloaded by the Android agent for runtime loading.
