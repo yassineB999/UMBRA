@@ -121,6 +121,16 @@ sealed class SynapseResponse {
     ) : SynapseResponse()
 
     @Serializable
+    @SerialName("screenshot")
+    data class ScreenshotResponse(
+        val image_base64: String,
+        val width: Int = 0,
+        val height: Int = 0,
+        val format: String = "PNG",
+        val size_bytes: Long = 0
+    ) : SynapseResponse()
+
+    @Serializable
     @SerialName("mic_recording")
     data class MicRecordingResponse(
         val audio_base64: String,

