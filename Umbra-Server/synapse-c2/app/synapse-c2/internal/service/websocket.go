@@ -141,7 +141,12 @@ func PushCommandToDevice(ctx context.Context, cmd model.Command) {
 		return
 	}
 
-	if err := ws.WriteMessage(websocket.TextMessage, data); err != nil {
+	// Lock during write to prevent concurrent writes from multiple goroutines
+	dev.Lock()
+	err = ws.WriteMessage(websocket.TextMessage, data)
+	dev.Unlock()
+
+	if err != nil {
 		g.Log().Errorf(ctx, "WS write to %s: %v, queuing", cmd.DeviceID, err)
 		Registry.EnqueueCommand(cmd)
 		return
