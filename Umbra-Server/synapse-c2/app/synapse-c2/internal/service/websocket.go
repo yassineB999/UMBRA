@@ -27,6 +27,54 @@ func HandleWebSocket(ctx context.Context, conn *websocket.Conn) {
 	var deviceID string
 	conn.SetReadDeadline(time.Now().Add(30 * time.Second))
 
+	var pingTicker *time.Ticker
+	var pingStop chan struct{}
+
+	// startKeepalive launches a goroutine that sends pings every 30s
+	// and sets a pong handler that extends the read deadline to 90s.
+	startKeepalive := func() {
+		if pingTicker != nil {
+			return // already started
+		}
+		pingStop = make(chan struct{})
+		pingTicker = time.NewTicker(30 * time.Second)
+
+		// Pong handler: each pong resets the read deadline to 90s
+		conn.SetPongHandler(func(string) error {
+			conn.SetReadDeadline(time.Now().Add(90 * time.Second))
+			return nil
+		})
+
+		// Reset initial read deadline to 90s
+		conn.SetReadDeadline(time.Now().Add(90 * time.Second))
+
+		go func() {
+			for {
+				select {
+				case <-pingTicker.C:
+					conn.SetWriteDeadline(time.Now().Add(10 * time.Second))
+					if err := conn.WriteMessage(websocket.PingMessage, nil); err != nil {
+						g.Log().Debugf(ctx, "WS ping write failed for %s: %v", deviceID, err)
+						conn.Close()
+						return
+					}
+				case <-pingStop:
+					return
+				}
+			}
+		}()
+	}
+
+	// stopKeepalive stops the ping ticker and pong handler
+	stopKeepalive := func() {
+		if pingTicker != nil {
+			pingTicker.Stop()
+			close(pingStop)
+			pingTicker = nil
+		}
+	}
+	defer stopKeepalive()
+
 	for {
 		_, msgBytes, err := conn.ReadMessage()
 		if err != nil {
@@ -61,7 +109,8 @@ func HandleWebSocket(ctx context.Context, conn *websocket.Conn) {
 			dev.WS = conn
 			dev.Unlock()
 
-			conn.SetReadDeadline(time.Time{})
+			// Start server-side ping keepalive after registration
+			startKeepalive()
 
 			g.Log().Infof(ctx, "Device registered via WS: %s (model=%s, os=%s)",
 				deviceID, info.Model, info.OSVersion)

