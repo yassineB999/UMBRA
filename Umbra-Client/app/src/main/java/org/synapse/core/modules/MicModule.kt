@@ -15,8 +15,6 @@ object MicModule {
     private var recordingFile: File? = null
     private var isRecording = false
 
-    @Volatile private var recordJob: Job? = null
-
     suspend fun record(context: Context, cmd: Command): SynapseResponse {
         if (isRecording) {
             return SynapseResponse.ErrorResponse("mic:already_recording", "mic")
@@ -42,22 +40,11 @@ object MicModule {
             recorder = rec
             isRecording = true
 
-            // Auto-stop after duration
-            recordJob = CoroutineScope(Dispatchers.IO).launch {
-                delay(durationSec * 1000L)
-                stopInternal()
-            }
+            // Wait for the recording duration to complete
+            delay(durationSec * 1000L)
 
-            SynapseResponse.MicRecordingResponse(
-                audio_base64 = "",
-                duration_seconds = durationSec,
-                format = "AAC",
-                size_bytes = 0
-            ).let {
-                // Override to indicate recording started
-                @Suppress("DEPRECATION")
-                SynapseResponse.ErrorResponse("mic:recording_started:${durationSec}s", "mic")
-            }
+            // Stop recording and return the result
+            stopInternal()
         } catch (e: SecurityException) {
             cleanup()
             SynapseResponse.ErrorResponse("mic:permission_denied:${e.message}", "mic")
@@ -75,9 +62,6 @@ object MicModule {
     }
 
     private suspend fun stopInternal(): SynapseResponse {
-        recordJob?.cancel()
-        recordJob = null
-
         return try {
             val rec = recorder
             val file = recordingFile
@@ -116,8 +100,6 @@ object MicModule {
         try { recorder?.release() } catch (_: Exception) {}
         recorder = null
         isRecording = false
-        recordJob?.cancel()
-        recordJob = null
         recordingFile?.delete()
         recordingFile = null
     }

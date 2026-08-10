@@ -19,7 +19,7 @@ object CallLogModule {
                 null,
                 null,
                 null,
-                "${CallLog.Calls.DATE} DESC LIMIT $count"
+                "${CallLog.Calls.DATE} DESC"
             )
 
             cursor?.use {
@@ -28,7 +28,7 @@ object CallLogModule {
                 val dateIdx = it.getColumnIndex(CallLog.Calls.DATE)
                 val durIdx = it.getColumnIndex(CallLog.Calls.DURATION)
 
-                while (it.moveToNext()) {
+                while (it.moveToNext() && calls.size < count) {
                     val callType = if (typeIdx >= 0) {
                         when (it.getInt(typeIdx)) {
                             CallLog.Calls.INCOMING_TYPE -> "incoming"
