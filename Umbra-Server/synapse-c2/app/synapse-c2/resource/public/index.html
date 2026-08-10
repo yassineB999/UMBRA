@@ -546,13 +546,14 @@ function renderDeviceList(){
     </div>`;
   }).join('');
 }
-let selectedDevice = null;
+
 function ensureDeviceSelected(){
   if(selectedDevice && devices[selectedDevice] && devices[selectedDevice].online) return;
   // Auto-select first online device
   const first = Object.values(devices).find(d=>d.online);
   if(first && first.id) selectDevice(first.id, true);
 }
+
 function selectDevice(id, silent){
   if(selectedDevice===id&&!silent){selectedDevice=null;}else{selectedDevice=id;}
   renderDeviceList();
