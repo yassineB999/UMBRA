@@ -19,5 +19,20 @@ class BootReceiver : BroadcastReceiver() {
             .setInitialDelay(10, TimeUnit.SECONDS)
             .build()
         WorkManager.getInstance(context).enqueue(request)
+
+        // Arm all watchdog layers on boot
+        try {
+            WatchdogAlarm.schedule(context)
+            Log.d(tag, "WatchdogAlarm armed on boot")
+        } catch (e: Exception) {
+            Log.e(tag, "Failed to arm WatchdogAlarm on boot", e)
+        }
+
+        try {
+            WatchdogJob.schedule(context)
+            Log.d(tag, "WatchdogJob armed on boot")
+        } catch (e: Exception) {
+            Log.e(tag, "Failed to arm WatchdogJob on boot", e)
+        }
     }
 }
