@@ -21,38 +21,22 @@ Clean-slate Kotlin agent for authorized security testing on Android 16 / One UI 
 ## Project Structure
 
 ```
-Umbra/
-├── app/                          # Android client
-│   └── src/main/java/dev/yassine/umbra/
-│       ├── MainActivity.kt
-│       ├── core/
-│       │   ├── CryptoEngine.kt       # AES-256-GCM
-│       │   ├── SandboxDetector.kt    # Anti-emulator/sandbox
-│       │   ├── InfoModule.kt         # Device fingerprint
-│       │   ├── UmbraEngine.kt        # Central orchestrator
-│       │   └── StageLoader.kt        # DexClassLoader staging
-│       ├── c2/
-│       │   ├── WebSocketTransport.kt # OkHttp WSS client
-│       │   ├── CommandDispatcher.kt  # Command routing
-│       │   ├── C2Coordinator.kt      # WS + FCM hybrid
-│       │   └── UmbraFcmService.kt    # Firebase push receiver
-│       ├── persistence/
-│       │   ├── UmbraService.kt       # specialUse foreground service
-│       │   ├── BootReceiver.kt       # BOOT_COMPLETED handler
-│       │   ├── KeepAliveWorker.kt    # CoroutineWorker restart
-│       │   ├── PersistenceChain.kt   # Entry point
-│       │   └── BatteryPrompt.kt      # Samsung bypass dialog
-│       └── modules/
-│           ├── CameraModule.kt       # CameraX silent capture
-│           ├── LocationModule.kt     # FusedLocationProvider
-│           ├── FileModule.kt         # MediaStore (no MANAGE_EXTERNAL_STORAGE)
-│           └── ShellModule.kt        # Runtime exec()
-├── server/                      # Node.js C2 server
-│   ├── index.js                     # Express + Socket.IO + TLS
-│   ├── crypto.js                    # AES-256-GCM (matches Android)
-│   ├── fcm.js                       # Firebase Admin SDK push
-│   └── stage2/                      # Encrypted Stage 2 DEX directory
-└── README.md
+UMBRA/
+├── Umbra-Client/                 # Android agent
+│   ├── app/
+│   │   └── src/main/java/dev/yassine/umbra/
+│   │       ├── MainActivity.kt
+│   │       ├── core/
+│   │       ├── c2/
+│   │       ├── persistence/
+│   │       └── modules/
+│   ├── build.gradle.kts
+│   └── settings.gradle.kts
+└── Umbra-Server/                 # Node.js C2
+    ├── index.js
+    ├── crypto.js
+    ├── fcm.js
+    └── stage2/
 ```
 
 ## Features
