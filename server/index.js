@@ -106,7 +106,7 @@ app.use((req, res, next) => {
 
 // Health
 app.get('/api/health', (req, res) => {
-  res.json({ status: 'ok', uptime: process.uptime(), devices: devices.size, fcm: fcm.isReady() });
+  res.json({ status: 'ok', uptime: process.uptime(), devices: devices.size, fcm: fcm.isConfigured() });
 });
 
 // Device list

