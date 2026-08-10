@@ -1,5 +1,6 @@
 package org.synapse.core.c2
 
+import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
@@ -8,6 +9,7 @@ import org.synapse.core.core.SynapseResponse
 
 @Serializable
 data class Command(
+    @SerialName("command_id")
     val cmd_id: String = "",
     val module: String = "",
     val action: String = "",
