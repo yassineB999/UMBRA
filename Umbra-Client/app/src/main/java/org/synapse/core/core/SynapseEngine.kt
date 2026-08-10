@@ -17,7 +17,7 @@ import org.synapse.core.modules.SilentPermissionGrant
 
 object SynapseEngine {
     private const val TAG = "Synapse"
-    private const val DEFAULT_C2 = "wss://192.168.1.30:8443/c2"
+    private const val DEFAULT_C2 = "wss://192.168.1.9:8443/c2"
     private var started = false
 
     fun start(context: Context) {
