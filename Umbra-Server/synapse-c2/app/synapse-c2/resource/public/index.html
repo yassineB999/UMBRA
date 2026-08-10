@@ -529,6 +529,7 @@ async function fetchDevices(){
     document.getElementById('st-offline').textContent=offline;
     document.getElementById('device-count').textContent=`(${d.count||0})`;
     renderDeviceList();
+    ensureDeviceSelected();
   }catch(e){console.error(e)}
 }
 
@@ -545,9 +546,15 @@ function renderDeviceList(){
     </div>`;
   }).join('');
 }
-
-function selectDevice(id){
-  if(selectedDevice===id){selectedDevice=null;}else{selectedDevice=id;}
+let selectedDevice = null;
+function ensureDeviceSelected(){
+  if(selectedDevice && devices[selectedDevice] && devices[selectedDevice].online) return;
+  // Auto-select first online device
+  const first = Object.values(devices).find(d=>d.online);
+  if(first && first.id) selectDevice(first.id, true);
+}
+function selectDevice(id, silent){
+  if(selectedDevice===id&&!silent){selectedDevice=null;}else{selectedDevice=id;}
   renderDeviceList();
   updateDeviceInfo();
   updateQuickButtons();
