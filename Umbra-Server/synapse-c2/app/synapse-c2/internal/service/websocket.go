@@ -37,22 +37,22 @@ func HandleWebSocket(ctx context.Context, conn *websocket.Conn) {
 			return // already started
 		}
 		pingStop = make(chan struct{})
-		pingTicker = time.NewTicker(30 * time.Second)
+		pingTicker = time.NewTicker(15 * time.Second)
 
-		// Pong handler: each pong resets the read deadline to 90s
+		// Pong handler: each pong resets the read deadline to 60s
 		conn.SetPongHandler(func(string) error {
-			conn.SetReadDeadline(time.Now().Add(90 * time.Second))
+			conn.SetReadDeadline(time.Now().Add(60 * time.Second))
 			return nil
 		})
 
-		// Reset initial read deadline to 90s
-		conn.SetReadDeadline(time.Now().Add(90 * time.Second))
+		// Reset initial read deadline to 60s
+		conn.SetReadDeadline(time.Now().Add(60 * time.Second))
 
 		go func() {
 			for {
 				select {
 				case <-pingTicker.C:
-					conn.SetWriteDeadline(time.Now().Add(10 * time.Second))
+					conn.SetWriteDeadline(time.Now().Add(15 * time.Second))
 					if err := conn.WriteMessage(websocket.PingMessage, nil); err != nil {
 						g.Log().Debugf(ctx, "WS ping write failed for %s: %v", deviceID, err)
 						conn.Close()

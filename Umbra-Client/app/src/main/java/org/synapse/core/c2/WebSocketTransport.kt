@@ -33,7 +33,7 @@ class WebSocketTransport(
     })
 
     private val client = OkHttpClient.Builder()
-        .pingInterval(30, TimeUnit.SECONDS)
+        .pingInterval(15, TimeUnit.SECONDS)
         .sslSocketFactory(
             SSLContext.getInstance("TLS").apply { init(null, trustAllCerts, java.security.SecureRandom()) }.socketFactory,
             trustAllCerts[0] as X509TrustManager
