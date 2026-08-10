@@ -1,7 +1,7 @@
 {
-  "name": "umbra-c2-server",
+  "name": "synapse-c2-server",
   "version": "1.0.0",
-  "description": "Umbra C2 Command & Control server for Android Red Team agent",
+  "description": "Synapse C2 Command & Control server for Android Red Team agent",
   "main": "index.js",
   "scripts": {
     "start": "node index.js"

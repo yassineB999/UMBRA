@@ -1,4 +1,4 @@
-# UMBRA — Android 16 Red Team Agent
+# SYNAPSE — Android 16 Red Team Agent
 
 > Clean-slate Kotlin agent + Node.js C2 for authorized security testing.
 > Android 16 / One UI 8.5 / Samsung Galaxy devices.

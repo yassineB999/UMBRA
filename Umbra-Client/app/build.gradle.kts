@@ -6,11 +6,11 @@ plugins {
 }
 
 android {
-    namespace = "dev.yassine.umbra"
+    namespace = "org.synapse.core"
     compileSdk = 37
 
     defaultConfig {
-        applicationId = "dev.yassine.umbra"
+        applicationId = "org.synapse.core"
         minSdk = 26
         targetSdk = 34
         versionCode = 1
@@ -47,7 +47,7 @@ dependencies {
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)
 
-    // Umbra core
+    // Synapse core
     implementation(libs.androidx.lifecycle.service)
     implementation(libs.androidx.work.runtime.ktx)
     implementation(libs.okhttp)

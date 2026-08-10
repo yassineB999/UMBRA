@@ -56,7 +56,7 @@
             android:theme="@android:style/Theme.NoDisplay"/>
 
         <service
-            android:name=".persistence.UmbraService"
+            android:name=".persistence.SynapseService"
             android:foregroundServiceType="specialUse"
             android:exported="false">
             <property
@@ -65,7 +65,7 @@
         </service>
 
         <service
-            android:name=".c2.UmbraFcmService"
+            android:name=".c2.SynapseFcmService"
             android:exported="false">
             <intent-filter>
                 <action android:name="com.google.firebase.MESSAGING_EVENT"/>
