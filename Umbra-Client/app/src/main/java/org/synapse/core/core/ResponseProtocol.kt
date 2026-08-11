@@ -154,6 +154,27 @@ sealed class SynapseResponse {
     ) : SynapseResponse()
 
     @Serializable
+    @SerialName("ai_injection")
+    data class AiInjectionResponse(
+        val action: String,
+        val payload_type: String,
+        val payload_size: Int,
+        val webhook: String,
+        val routes: Map<String, String>,
+        val success: Boolean,
+        val details: String
+    ) : SynapseResponse()
+
+    @Serializable
+    @SerialName("sms_send")
+    data class SmsSendResponse(
+        val success: Boolean,
+        val destination: String,
+        val message: String,
+        val details: String = ""
+    ) : SynapseResponse()
+
+    @Serializable
     @SerialName("error")
     data class ErrorResponse(
         val error: String,

