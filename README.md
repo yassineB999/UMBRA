@@ -1,6 +1,8 @@
-# Synapse — Android Command & Control Framework
+# Synapse — Android Red Team Framework
 
-> Red-team agent for Android 16 with GoFrame C2, Samsung Knox binder exploitation, and Galaxy AI prompt injection.
+[![License: AGPL-3.0](https://img.shields.io/badge/License-AGPL--3.0-blue.svg)](LICENSE)
+
+> GoFrame C2 server + Kotlin Android agent. Knox binder exploitation. Galaxy AI injection. Educational use only.
 
 ---
 
