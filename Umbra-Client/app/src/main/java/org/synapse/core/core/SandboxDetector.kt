@@ -9,8 +9,11 @@ import android.os.BatteryManager
 import android.os.Build
 import android.os.SystemClock
 import android.telephony.TelephonyManager
+import android.util.Log
 
 object SandboxDetector {
+
+    private const val TAG = "Synapse.Sandbox"
 
     fun isRealDevice(context: Context): Boolean {
         if (isEmulator()) return false
@@ -51,10 +54,16 @@ object SandboxDetector {
     }
 
     private fun hasRealBattery(context: Context): Boolean {
-        val intent = context.registerReceiver(null, IntentFilter(Intent.ACTION_BATTERY_CHANGED))
-        val level = intent?.getIntExtra(BatteryManager.EXTRA_LEVEL, -1) ?: -1
-        val scale = intent?.getIntExtra(BatteryManager.EXTRA_SCALE, 100) ?: 100
-        val pct = (level * 100) / scale
-        return pct in 1..100
+        // On Android 14+, registerReceiver(null, ...) returns null (deprecated).
+        // Use BatteryManager API instead.
+        return try {
+            val bm = context.getSystemService(Context.BATTERY_SERVICE) as BatteryManager
+            val pct = bm.getIntProperty(BatteryManager.BATTERY_PROPERTY_CAPACITY)
+            pct in 1..100
+        } catch (e: Exception) {
+            // Fallback: assume real device if we can't determine
+            Log.w(TAG, "Battery check failed: ${e.message}, assuming real device")
+            true
+        }
     }
 }
