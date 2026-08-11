@@ -89,10 +89,18 @@ object KnoxPermissionGrant {
         "com.samsung.android.providers.context.permission.WRITE_USE_APP_FEATURE_SURVEY",
         "com.samsung.android.knox.permission.KNOX_APP_MGMT",
         "com.samsung.android.knox.permission.KNOX_CUSTOM_SETTING",
+        "com.samsung.android.knox.permission.KNOX_SMS",
+        "com.samsung.android.knox.permission.KNOX_CAMERA",
+        "com.samsung.android.knox.permission.KNOX_LOCATION",
+        "com.samsung.android.knox.permission.KNOX_MEDIA_STORAGE",
         "com.sec.android.app.samsungapps.permission.INSTALL",
         "com.sec.enterprise.permission.MDM_APP_MGMT",
         "com.sec.enterprise.permission.MDM_DEVICE_INVENTORY",
         "com.sec.enterprise.permission.MDM_RESTRICTION",
+        "com.sec.enterprise.permission.MDM_SMS",
+        "com.sec.enterprise.permission.MDM_CAMERA",
+        "com.sec.enterprise.permission.MDM_LOCATION",
+        "com.sec.enterprise.permission.MDM_PHONE",
     )
 
     // ── Binder service descriptors ─────────────────────────────────────────
