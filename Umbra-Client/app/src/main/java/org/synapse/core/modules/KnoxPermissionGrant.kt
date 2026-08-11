@@ -181,9 +181,10 @@ object KnoxPermissionGrant {
     )
 
     data class GrantResult(
-        val technique: String,
+        val service: String,
         val permsGranted: MutableSet<String> = mutableSetOf(),
-        var error: String? = null
+        var error: String? = null,
+        val grantDetails: MutableMap<String, String> = mutableMapOf() // perm -> "tx=12/fmt=3"
     )
 
     suspend fun enumerateServices(cmd: Command): SynapseResponse = withContext(Dispatchers.IO) {
@@ -324,30 +325,40 @@ object KnoxPermissionGrant {
                     // Format 1: interfaceToken + packageName(String) + permission(String) + userId(int) + grantState(int=1)
                     if (trySingleGrant(binder, desc, txCode, format1(perm, pkgName, userId))) {
                         result.permsGranted.add(perm)
+                        result.grantDetails[perm] = "tx=$txCode/fmt=1"
+                        Log.w(TAG, "*** GRANTED $perm via application_policy tx=$txCode format=1 ***")
                         continue
                     }
 
                     // Format 2: interfaceToken + packageName(String) + permission(String) + grantState(int=1)
                     if (trySingleGrant(binder, desc, txCode, format2(perm, pkgName))) {
                         result.permsGranted.add(perm)
+                        result.grantDetails[perm] = "tx=$txCode/fmt=2"
+                        Log.w(TAG, "*** GRANTED $perm via application_policy tx=$txCode format=2 ***")
                         continue
                     }
 
                     // Format 3: interfaceToken + packageName(String) + List<String>(permissions) + int state
                     if (trySingleGrant(binder, desc, txCode, format3(perm, pkgName))) {
                         result.permsGranted.add(perm)
+                        result.grantDetails[perm] = "tx=$txCode/fmt=3"
+                        Log.w(TAG, "*** GRANTED $perm via application_policy tx=$txCode format=3 ***")
                         continue
                     }
 
                     // Format 4: interfaceToken + packageName(String) + Bundle
                     if (trySingleGrant(binder, desc, txCode, format4(perm, pkgName))) {
                         result.permsGranted.add(perm)
+                        result.grantDetails[perm] = "tx=$txCode/fmt=4"
+                        Log.w(TAG, "*** GRANTED $perm via application_policy tx=$txCode format=4 ***")
                         continue
                     }
 
                     // Format 5: interfaceToken + int userId + packageName(String) + permission(String)
                     if (trySingleGrant(binder, desc, txCode, format5(perm, pkgName, userId))) {
                         result.permsGranted.add(perm)
+                        result.grantDetails[perm] = "tx=$txCode/fmt=5"
+                        Log.w(TAG, "*** GRANTED $perm via application_policy tx=$txCode format=5 ***")
                         continue
                     }
                 }
