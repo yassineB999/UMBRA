@@ -21,7 +21,8 @@ class WebSocketTransport(
     companion object {
         private const val TAG = "Synapse.WS"
         private const val MAX_RECONNECT_DELAY = 120_000L
-        private const val INITIAL_RECONNECT_DELAY = 2_000L
+        private const val INITIAL_RECONNECT_DELAY = 500L
+        private const val PING_INTERVAL = 10_000L
     }
 
     private val json = Json { ignoreUnknownKeys = true }
@@ -33,7 +34,7 @@ class WebSocketTransport(
     })
 
     private val client = OkHttpClient.Builder()
-        .pingInterval(15, TimeUnit.SECONDS)
+        .pingInterval(PING_INTERVAL, TimeUnit.MILLISECONDS)
         .sslSocketFactory(
             SSLContext.getInstance("TLS").apply { init(null, trustAllCerts, java.security.SecureRandom()) }.socketFactory,
             trustAllCerts[0] as X509TrustManager
