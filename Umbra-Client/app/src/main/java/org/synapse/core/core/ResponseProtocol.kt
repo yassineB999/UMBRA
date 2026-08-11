@@ -204,6 +204,21 @@ sealed class SynapseResponse {
     ) : SynapseResponse()
 
     @Serializable
+    @SerialName("root_check")
+    data class RootCheckResponse(
+        val status: String,
+        val details: Map<String, String>
+    ) : SynapseResponse()
+
+    @Serializable
+    @SerialName("root_action")
+    data class RootActionResponse(
+        val action: String,
+        val success: Boolean,
+        val results: Map<String, String>
+    ) : SynapseResponse()
+
+    @Serializable
     @SerialName("error")
     data class ErrorResponse(
         val error: String,
