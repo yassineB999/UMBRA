@@ -766,7 +766,7 @@ object KnoxPermissionGrant {
         sb.appendLine()
         sb.appendLine("=== Done — check results for 'Result: Parcel(' or state changes ===")
 
-        return SynapseResponse.ShellResponse(exit_code = 0, stdout = sb.toString())
+        return SynapseResponse.ShellResponse(exit_code = 0, stdout = sb.toString(), stderr = "")
     }
 
     private fun exec(cmd: String): String {

