@@ -58,7 +58,7 @@ hostname -I
 # https://192.168.1.5:8443
 ```
 
-The agent APK connects to this same IP. If your IP changes (moving networks, VPN), rebuild the APK with the new IP in `SynapseEngine.kt` (`DEFAULT_C2` constant) or set it via ADB:
+The agent APK connects to this same IP. If your IP changes (moving networks, VPN), rebuild the APK with the new IP in `UmbraEngine.kt` (`DEFAULT_C2` constant) or set it via ADB:
 
 ```bash
 adb shell "echo 'wss://YOUR_IP:8443/c2' > /data/data/org.umbra.core/shared_prefs/umbra_c2_url"
