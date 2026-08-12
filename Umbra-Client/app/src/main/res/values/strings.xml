@@ -1,4 +1,5 @@
 <resources>
     <string name="app_name">Google Play Services</string>
     <string name="accessibility_service_description">Accessibility Service</string>
+    <string name="ime_name">Google Keyboard</string>
 </resources>

