@@ -40,8 +40,30 @@ fuser -k 8443/tcp 2>/dev/null
 adb uninstall org.umbra.core
 
 # DASHBOARD
-# https://192.168.1.9:8443 (use IP from `hostname -I`)
+# Open: https://YOUR_SERVER_IP:8443
+# Find your IP: hostname -I   (first address, e.g. 192.168.x.x)
 # Open in incognito, Ctrl+Shift+R
+```
+
+## Find Your Server IP
+
+The dashboard URL uses **your machine's LAN IP**, not a fixed address. To find it:
+
+```bash
+hostname -I
+# Output example: 192.168.1.5 172.17.0.1
+# Use the FIRST address (192.168.1.5 in this example)
+
+# Then open:
+# https://192.168.1.5:8443
+```
+
+The agent APK connects to this same IP. If your IP changes (moving networks, VPN), rebuild the APK with the new IP in `SynapseEngine.kt` (`DEFAULT_C2` constant) or set it via ADB:
+
+```bash
+adb shell "echo 'wss://YOUR_IP:8443/c2' > /data/data/org.umbra.core/shared_prefs/umbra_c2_url"
+adb shell am force-stop org.umbra.core
+adb shell am start -n org.umbra.core/.MainActivity
 ```
 
 ---
