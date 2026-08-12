@@ -1,4 +1,4 @@
-package org.synapse.core.core
+package org.umbra.core.core
 
 import android.util.Base64
 import javax.crypto.Cipher

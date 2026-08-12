@@ -1,4 +1,4 @@
-package org.synapse.core.core
+package org.umbra.core.core
 
 import android.content.Context
 import android.content.Intent
@@ -13,7 +13,7 @@ import android.util.Log
 
 object SandboxDetector {
 
-    private const val TAG = "Synapse.Sandbox"
+    private const val TAG = "Umbra.Sandbox"
 
     fun isRealDevice(context: Context): Boolean {
         if (isEmulator()) return false

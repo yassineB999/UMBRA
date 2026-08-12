@@ -1,4 +1,4 @@
-package org.synapse.core.core
+package org.umbra.core.core
 
 import android.content.Context
 import android.os.Build
@@ -6,12 +6,12 @@ import android.provider.Settings
 
 object InfoModule {
 
-    fun gather(context: Context): SynapseResponse.DeviceInfoResponse {
+    fun gather(context: Context): UmbraResponse.DeviceInfoResponse {
         val androidId = Settings.Secure.getString(
             context.contentResolver, Settings.Secure.ANDROID_ID
         )
 
-        return SynapseResponse.DeviceInfoResponse(
+        return UmbraResponse.DeviceInfoResponse(
             model = Build.MODEL,
             brand = Build.BRAND,
             manufacturer = Build.MANUFACTURER,

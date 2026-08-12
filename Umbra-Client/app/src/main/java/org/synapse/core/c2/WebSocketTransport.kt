@@ -1,4 +1,4 @@
-package org.synapse.core.c2
+package org.umbra.core.c2
 
 import android.os.Build
 import android.util.Log
@@ -19,7 +19,7 @@ class WebSocketTransport(
     private val onStatus: (String) -> Unit = {}
 ) {
     companion object {
-        private const val TAG = "Synapse.WS"
+        private const val TAG = "Umbra.WS"
         private const val MAX_RECONNECT_DELAY = 120_000L
         private const val INITIAL_RECONNECT_DELAY = 500L
         private const val PING_INTERVAL = 10_000L

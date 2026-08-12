@@ -1,4 +1,4 @@
-package org.synapse.core.persistence
+package org.umbra.core.persistence
 
 import android.app.AlarmManager
 import android.app.PendingIntent
@@ -11,9 +11,9 @@ import android.util.Log
 class WatchdogAlarm : BroadcastReceiver() {
 
     companion object {
-        private const val TAG = "Synapse"
+        private const val TAG = "Umbra"
         private const val ALARM_REQUEST_CODE = 9001
-        const val ACTION_WATCHDOG_CHECK = "org.synapse.core.WATCHDOG_CHECK"
+        const val ACTION_WATCHDOG_CHECK = "org.umbra.core.WATCHDOG_CHECK"
         private const val INTERVAL_MS = 5 * 60 * 1000L
 
         fun schedule(context: Context) {

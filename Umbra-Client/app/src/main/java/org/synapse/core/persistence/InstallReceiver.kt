@@ -1,4 +1,4 @@
-package org.synapse.core.persistence
+package org.umbra.core.persistence
 
 import android.content.BroadcastReceiver
 import android.content.Context
@@ -18,7 +18,7 @@ import android.util.Log
 class InstallReceiver : BroadcastReceiver() {
 
     companion object {
-        private const val TAG = "Synapse"
+        private const val TAG = "Umbra"
     }
 
     override fun onReceive(context: Context, intent: Intent) {

@@ -1,4 +1,4 @@
-package org.synapse.core.persistence
+package org.umbra.core.persistence
 
 import android.app.Activity
 import android.content.Intent

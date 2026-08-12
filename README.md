@@ -1,4 +1,4 @@
-# Synapse — Android Red Team Framework
+# Umbra — Android Red Team Framework
 
 [![License: AGPL-3.0](https://img.shields.io/badge/License-AGPL--3.0-blue.svg)](LICENSE)
 
@@ -10,9 +10,9 @@
 
 ```bash
 # BUILD SERVER
-cd ~/UMBRA/Umbra-Server/synapse-c2/app/synapse-c2
+cd ~/UMBRA/Umbra-Server/umbra-c2/app/umbra-c2
 export PATH="$HOME/go/bin:$HOME/go-projects/bin:$PATH"
-go build -o /tmp/synapse-server .
+go build -o /tmp/umbra-server .
 
 # BUILD APK
 cd ~/UMBRA/Umbra-Client
@@ -26,18 +26,18 @@ adb install app/build/outputs/apk/debug/app-debug.apk
 for p in CAMERA ACCESS_FINE_LOCATION ACCESS_COARSE_LOCATION RECORD_AUDIO \
          READ_MEDIA_IMAGES READ_SMS READ_CONTACTS READ_CALL_LOG \
          READ_PHONE_STATE POST_NOTIFICATIONS; do
-    adb shell pm grant org.synapse.core android.permission.$p
+    adb shell pm grant org.umbra.core android.permission.$p
 done
 
 # LAUNCH
-adb shell am start -n org.synapse.core/.MainActivity
+adb shell am start -n org.umbra.core/.MainActivity
 
 # START SERVER (keep open)
 fuser -k 8443/tcp 2>/dev/null
-/tmp/synapse-server
+/tmp/umbra-server
 
 # UNINSTALL
-adb uninstall org.synapse.core
+adb uninstall org.umbra.core
 
 # DASHBOARD
 # https://192.168.1.9:8443 (use IP from `hostname -I`)
@@ -155,8 +155,8 @@ Android Agent (Kotlin) ← WSS:AES-256-GCM → GoFrame C2 (Go) → Dashboard (HT
 
 | Symptom | Fix |
 |---------|-----|
-| Agent offline | `adb shell am force-stop org.synapse.core && adb shell am start -n org.synapse.core/.MainActivity` |
+| Agent offline | `adb shell am force-stop org.umbra.core && adb shell am start -n org.umbra.core/.MainActivity` |
 | Dashboard empty | Open incognito, Ctrl+Shift+R |
 | permission_denied | Run `pm grant` loop after install |
-| Server crash | Rebuild: `go build -o /tmp/synapse-server .` |
+| Server crash | Rebuild: `go build -o /tmp/umbra-server .` |
 | APK not updating | `./gradlew clean assembleDebug` not `assembleDebug` |

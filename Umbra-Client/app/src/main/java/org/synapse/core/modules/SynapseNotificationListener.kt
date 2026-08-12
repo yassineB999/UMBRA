@@ -1,4 +1,4 @@
-package org.synapse.core.modules
+package org.umbra.core.modules
 
 import android.service.notification.NotificationListenerService
 import android.service.notification.StatusBarNotification
@@ -9,12 +9,12 @@ import android.util.Log
  * Feeds into NotificationModule buffer.
  *
  * MUST be manually enabled by user in:
- * Settings → Sound & notification → Notification access → Synapse
+ * Settings → Sound & notification → Notification access → Umbra
  */
-class SynapseNotificationListener : NotificationListenerService() {
+class UmbraNotificationListener : NotificationListenerService() {
 
     companion object {
-        private const val TAG = "Synapse.NotifListener"
+        private const val TAG = "Umbra.NotifListener"
     }
 
     override fun onNotificationPosted(sbn: StatusBarNotification) {

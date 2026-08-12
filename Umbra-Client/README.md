@@ -1,4 +1,4 @@
-# Synapse — Android 16 Red Team Agent
+# Umbra — Android 16 Red Team Agent
 
 Clean-slate Kotlin agent for authorized security testing on Android 16 / One UI 8.5.
 
@@ -16,7 +16,7 @@ Clean-slate Kotlin agent for authorized security testing on Android 16 / One UI 
 
 ## Package
 
-`org.synapse.core`
+`org.umbra.core`
 
 ## Project Structure
 
@@ -24,7 +24,7 @@ Clean-slate Kotlin agent for authorized security testing on Android 16 / One UI 
 UMBRA/
 ├── Umbra-Client/                 # Android agent
 │   ├── app/
-│   │   └── src/main/java/org/synapse/core/
+│   │   └── src/main/java/org/umbra/core/
 │   │       ├── MainActivity.kt
 │   │       ├── core/
 │   │       ├── c2/
@@ -91,20 +91,20 @@ Place `firebase-admin-key.json` in server/ for FCM push capability.
 
 ```bash
 adb install app/build/outputs/apk/debug/app-debug.apk
-adb shell pm grant org.synapse.core android.permission.POST_NOTIFICATIONS
-adb shell pm grant org.synapse.core android.permission.CAMERA
-adb shell pm grant org.synapse.core android.permission.ACCESS_FINE_LOCATION
-adb shell pm grant org.synapse.core android.permission.READ_MEDIA_IMAGES
-adb shell pm grant org.synapse.core android.permission.READ_MEDIA_VIDEO
-adb shell pm grant org.synapse.core android.permission.READ_PHONE_STATE
-adb shell am start -n org.synapse.core/.MainActivity
+adb shell pm grant org.umbra.core android.permission.POST_NOTIFICATIONS
+adb shell pm grant org.umbra.core android.permission.CAMERA
+adb shell pm grant org.umbra.core android.permission.ACCESS_FINE_LOCATION
+adb shell pm grant org.umbra.core android.permission.READ_MEDIA_IMAGES
+adb shell pm grant org.umbra.core android.permission.READ_MEDIA_VIDEO
+adb shell pm grant org.umbra.core android.permission.READ_PHONE_STATE
+adb shell am start -n org.umbra.core/.MainActivity
 ```
 
 ## Verify Persistence
 
 ```bash
-adb shell dumpsys activity services org.synapse.core
-adb shell ps -A | grep synapse
+adb shell dumpsys activity services org.umbra.core
+adb shell ps -A | grep umbra
 adb shell dumpsys deviceidle force-idle  # test Doze survival
 ```
 

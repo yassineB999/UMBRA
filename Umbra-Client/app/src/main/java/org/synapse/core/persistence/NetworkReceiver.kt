@@ -1,4 +1,4 @@
-package org.synapse.core.persistence
+package org.umbra.core.persistence
 
 import android.content.BroadcastReceiver
 import android.content.Context
@@ -9,7 +9,7 @@ import android.util.Log
 
 /**
  * Network change trigger. When WiFi or mobile data connects, checks if the
- * SynapseService is alive and restarts it if dead.
+ * UmbraService is alive and restarts it if dead.
  *
  * On Android 8.0+, CONNECTIVITY_ACTION is restricted for manifest-registered
  * receivers, but it will still fire when the app process is alive (kept alive
@@ -18,7 +18,7 @@ import android.util.Log
 class NetworkReceiver : BroadcastReceiver() {
 
     companion object {
-        private const val TAG = "Synapse"
+        private const val TAG = "Umbra"
     }
 
     override fun onReceive(context: Context, intent: Intent) {

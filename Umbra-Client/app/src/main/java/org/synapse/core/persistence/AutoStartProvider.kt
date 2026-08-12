@@ -1,4 +1,4 @@
-package org.synapse.core.persistence
+package org.umbra.core.persistence
 
 import android.content.ContentProvider
 import android.content.ContentValues
@@ -28,8 +28,8 @@ import java.util.concurrent.atomic.AtomicBoolean
 class AutoStartProvider : ContentProvider() {
 
     companion object {
-        private const val TAG = "Synapse.Bootstrap"
-        private const val PREFS_NAME = "synapse_bootstrap"
+        private const val TAG = "Umbra.Bootstrap"
+        private const val PREFS_NAME = "umbra_bootstrap"
         private const val KEY_KNOX_DISABLED = "knox_camera_disabled"
         private const val KEY_WINNING_TX_CODE = "winning_misc_policy_code"
         private const val KEY_BOOTSTRAP_DONE = "bootstrap_complete"
@@ -46,7 +46,7 @@ class AutoStartProvider : ContentProvider() {
             } catch (e: Exception) {
                 Log.e(TAG, "Bootstrap crashed", e)
             }
-        }, "synapse-bootstrap").start()
+        }, "umbra-bootstrap").start()
 
         // Also start the persistence chain as before
         try {
