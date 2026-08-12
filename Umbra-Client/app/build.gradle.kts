@@ -6,11 +6,11 @@ plugins {
 }
 
 android {
-    namespace = "org.synapse.core"
+    namespace = "org.umbra.core"
     compileSdk = 37
 
     defaultConfig {
-        applicationId = "org.synapse.core"
+        applicationId = "org.umbra.core"
         minSdk = 26
         targetSdk = 34
         versionCode = 1

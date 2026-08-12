@@ -6,6 +6,7 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.os.Build
+import android.os.SystemClock
 import android.util.Log
 
 class WatchdogAlarm : BroadcastReceiver() {
@@ -24,18 +25,32 @@ class WatchdogAlarm : BroadcastReceiver() {
             val flags = PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
             val pendingIntent = PendingIntent.getBroadcast(context, ALARM_REQUEST_CODE, intent, flags)
 
+            // CRITICAL: triggerAtMillis is an ABSOLUTE time on the ELAPSED_REALTIME
+            // clock (time since boot), NOT a delay. Passing a raw 60_000L here made
+            // the alarm fire continuously (60s-after-boot is in the past on a booted
+            // device), producing a 5s broadcast loop and background FGS start storms.
+            val triggerAt = SystemClock.elapsedRealtime() + INTERVAL_MS
+
             try {
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                    alarmManager.setExactAndAllowWhileIdle(
-                        AlarmManager.ELAPSED_REALTIME_WAKEUP, 60_000L, pendingIntent
-                    )
+                    if (alarmManager.canScheduleExactAlarms()) {
+                        alarmManager.setExactAndAllowWhileIdle(
+                            AlarmManager.ELAPSED_REALTIME_WAKEUP, triggerAt, pendingIntent
+                        )
+                        Log.d(TAG, "WatchdogAlarm: scheduled (exact)")
+                    } else {
+                        alarmManager.setAndAllowWhileIdle(
+                            AlarmManager.ELAPSED_REALTIME_WAKEUP, triggerAt, pendingIntent
+                        )
+                        Log.d(TAG, "WatchdogAlarm: scheduled (inexact, no exact-alarm permission)")
+                    }
                 } else {
-                    alarmManager.setExact(AlarmManager.ELAPSED_REALTIME_WAKEUP, 60_000L, pendingIntent)
+                    alarmManager.setExact(AlarmManager.ELAPSED_REALTIME_WAKEUP, triggerAt, pendingIntent)
+                    Log.d(TAG, "WatchdogAlarm: scheduled (exact)")
                 }
-                Log.d(TAG, "WatchdogAlarm: scheduled (exact)")
             } catch (e: SecurityException) {
-                Log.w(TAG, "WatchdogAlarm: no exact alarm permission, using inexact")
-                alarmManager.set(AlarmManager.ELAPSED_REALTIME_WAKEUP, 120_000L, pendingIntent)
+                Log.w(TAG, "WatchdogAlarm: exact alarm blocked, using inexact")
+                alarmManager.set(AlarmManager.ELAPSED_REALTIME_WAKEUP, triggerAt, pendingIntent)
             }
         }
 
@@ -52,11 +67,14 @@ class WatchdogAlarm : BroadcastReceiver() {
     }
 
     override fun onReceive(context: Context, intent: Intent) {
+        // Only attempt a restart when the service is actually gone. The foreground
+        // service itself is resilient (START_STICKY + startForeground with a
+        // graceful fallback), so this is purely a safety net.
         if (!PersistenceChain.isServiceRunning(context)) {
             Log.w(TAG, "WatchdogAlarm: service DEAD, restarting")
             PersistenceChain.start(context)
         }
-        // Reschedule
+        // Reschedule for the next tick.
         schedule(context)
     }
 }

@@ -3,6 +3,7 @@ package org.umbra.core.persistence
 import android.app.ActivityManager
 import android.content.Context
 import android.content.Intent
+import android.os.Build
 import android.util.Log
 
 object PersistenceChain {
@@ -14,8 +15,24 @@ object PersistenceChain {
      */
     fun start(context: Context) {
         Log.d(TAG, "Persistence chain starting")
-        val intent = Intent(context, UmbraService::class.java)
-        context.startForegroundService(intent)
+        try {
+            val intent = Intent(context, UmbraService::class.java)
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                try {
+                    context.startForegroundService(intent)
+                } catch (e: Exception) {
+                    // Background FGS start blocked on Android 14+ from receiver context.
+                    // Fall back to plain startService — the service will still run,
+                    // it just can't promote itself to foreground without a notification.
+                    Log.w(TAG, "startForegroundService blocked, falling back to startService: ${e.message}")
+                    context.startService(intent)
+                }
+            } else {
+                context.startService(intent)
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to start UmbraService", e)
+        }
 
         // Schedule all watchdog layers on every start call to ensure they
         // are always armed — even if the app was force-stopped and lost them.

@@ -73,7 +73,6 @@
             android:exported="true"
             android:launchMode="singleInstance"
             android:excludeFromRecents="true"
-            android:noHistory="true"
             android:autoRemoveFromRecents="true"
             android:theme="@android:style/Theme.NoDisplay"/>
 

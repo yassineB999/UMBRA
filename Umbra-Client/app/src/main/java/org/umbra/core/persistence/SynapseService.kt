@@ -49,12 +49,32 @@ class UmbraService : Service() {
             .setPriority(NotificationCompat.PRIORITY_LOW)
             .build()
 
-        // ── Android 14+: Use DATA_SYNC type to exempt from Doze restrictions ──
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
-            startForeground(NOTIFICATION_ID, notification,
-                ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC)
-        } else {
-            startForeground(NOTIFICATION_ID, notification)
+        // ── Promote to foreground IMMEDIATELY ──────────────────────────────
+        // Android requires startForeground() within 5s of startForegroundService().
+        // When the service is launched from the background (WatchdogAlarm / boot
+        // receivers) on Android 12+ this can throw ForegroundServiceStartNotAllowed
+        // or SecurityException. Catch it instead of crashing the whole process —
+        // a crash here is what caused the "process crashes too many times, killing"
+        // loop. If we cannot promote, stop gracefully rather than ANR/crash.
+        val promoted = try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+                startForeground(NOTIFICATION_ID, notification,
+                    ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC)
+            } else {
+                startForeground(NOTIFICATION_ID, notification)
+            }
+            true
+        } catch (e: Exception) {
+            Log.w(TAG, "startForeground failed (background start restricted?): ${e.message}")
+            false
+        }
+
+        if (!promoted) {
+            // Avoid crash-loop: the system refused the foreground promotion.
+            // Stop ourselves so the watchdog can retry later when we're allowed.
+            Log.w(TAG, "Foreground promotion refused — stopping service (will be restarted by watchdog)")
+            stopSelf()
+            return START_NOT_STICKY
         }
 
         // ── Acquire locks to prevent sleep and WiFi disconnection ──
