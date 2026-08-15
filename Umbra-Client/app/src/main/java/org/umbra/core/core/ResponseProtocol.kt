@@ -212,6 +212,14 @@ sealed class UmbraResponse {
     ) : UmbraResponse()
 
     @Serializable
+    @SerialName("exploit_result")
+    data class ExploitResponse(
+        val target: String,
+        val success: Boolean,
+        val findings: Map<String, String>
+    ) : UmbraResponse()
+
+    @Serializable
     @SerialName("error")
     data class ErrorResponse(
         val error: String,

