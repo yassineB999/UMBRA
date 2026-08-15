@@ -154,6 +154,17 @@ object KnoxPermissionGrant {
         val results = mutableListOf<String>()
         val remaining = requested.filter { before[it] != true }.toMutableSet()
 
+        // ── Phase 0: targeted runtime-permission grant (the documented bridge) ──
+        // setRuntimePermissionState / applyRuntimePermissions with state=2 (ALLOWED).
+        // This is the ONLY path documented to flip checkSelfPermission(), not just
+        // Knox MDM policy. Sweep tx codes and detect the permission flip.
+        if (remaining.isNotEmpty()) {
+            val r = tryRuntimePermissionGrant(context, remaining.toList(), pkgName)
+            recordGrants(context, remaining, r)
+            results.add("runtime_perm_grant: ${r.permsGranted.size} granted, ${r.error ?: "ok"}")
+            Log.d(TAG, "After runtime_perm_grant: granted=${r.permsGranted.size}, remaining=${remaining.size}")
+        }
+
         // ── Phase 1: application_policy binder ──────────────────────────
         if (remaining.isNotEmpty()) {
             val r = tryApplicationPolicyGrant(remaining, pkgName, uid, userId)
@@ -464,6 +475,90 @@ object KnoxPermissionGrant {
         writeInt(userId)
         writeString(pkgName)
         writeString(perm)
+    }
+
+    /**
+     * Format 6: applyRuntimePermissions(AppIdentity, List<String>, int)
+     * AppIdentity = (packageName String, signature String|null)
+     * Parcel: pkg + signature(null) + StringList(perms) + int state
+     * state = 2 = RUNTIME_PERMISSION_STATE_ALLOWED / PERMISSION_POLICY_STATE_GRANT
+     * THIS is the documented Knox→Android permission bridge.
+     */
+    private fun format6_applyRuntimePermissions(pkgName: String, perms: List<String>): Parcel.() -> Unit = {
+        writeString(pkgName)          // AppIdentity.packageName
+        writeString(null)             // AppIdentity.signature (null ok)
+        writeStringList(perms)        // List<String>
+        writeInt(2)                   // ALLOWED / GRANT
+    }
+
+    /**
+     * Format 7: setRuntimePermissionState(String pkg, String perm, int state)
+     * state = 2 = RUNTIME_PERMISSION_STATE_ALLOWED
+     */
+    private fun format7_setRuntimePermissionState(pkgName: String, perm: String): Parcel.() -> Unit = {
+        writeString(pkgName)
+        writeString(perm)
+        writeInt(2)                   // ALLOWED
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // Phase 0: targeted runtime-permission grant sweep
+    // setRuntimePermissionState / applyRuntimePermissions — the documented
+    // Knox→Android bridge. Sweep tx codes and detect the permission flip.
+    // ═══════════════════════════════════════════════════════════════════════
+
+    private fun tryRuntimePermissionGrant(
+        context: Context,
+        perms: List<String>,
+        pkgName: String
+    ): GrantResult {
+        val result = GrantResult("runtime_perm_grant")
+        val canary = perms.firstOrNull() ?: return result
+
+        val services = listOf("application_policy", "enterprise_policy")
+        val descriptors = (APPLICATION_POLICY_DESCRIPTORS + ENTERPRISE_POLICY_DESCRIPTORS).distinct()
+
+        for (svc in services) {
+            val binder = getBinderService(svc) ?: continue
+            Log.d(TAG, "[Phase0] sweeping $svc for runtime-permission grant tx")
+
+            for (desc in descriptors) {
+                // EDM interfaces are large (up to ~600 methods); sweep generously.
+                for (tx in 1..200) {
+                    // shape 1: setRuntimePermissionState(pkg, perm, 2)
+                    if (trySingleGrant(binder, desc, tx, format7_setRuntimePermissionState(pkgName, canary))) {
+                        if (context.checkSelfPermission(canary) == PackageManager.PERMISSION_GRANTED) {
+                            Log.w(TAG, "[Phase0] GRANTED $canary via $svc tx=$tx setRuntimePermissionState")
+                            result.permsGranted.add(canary)
+                            // bulk-grant the rest with the confirmed tx
+                            for (p in perms) {
+                                if (p == canary) continue
+                                if (trySingleGrant(binder, desc, tx, format7_setRuntimePermissionState(pkgName, p))) {
+                                    if (context.checkSelfPermission(p) == PackageManager.PERMISSION_GRANTED) {
+                                        result.permsGranted.add(p)
+                                    }
+                                }
+                            }
+                            return result
+                        }
+                    }
+                    // shape 2: applyRuntimePermissions(AppIdentity, List<String>, 2)
+                    if (trySingleGrant(binder, desc, tx, format6_applyRuntimePermissions(pkgName, perms))) {
+                        if (context.checkSelfPermission(canary) == PackageManager.PERMISSION_GRANTED) {
+                            Log.w(TAG, "[Phase0] GRANTED $canary via $svc tx=$tx applyRuntimePermissions")
+                            for (p in perms) {
+                                if (context.checkSelfPermission(p) == PackageManager.PERMISSION_GRANTED) {
+                                    result.permsGranted.add(p)
+                                }
+                            }
+                            return result
+                        }
+                    }
+                }
+            }
+        }
+        result.error = "no runtime-permission grant tx found (admin-gated or absent)"
+        return result
     }
 
     // ── Low-level grant attempt ──────────────────────────────────────────
