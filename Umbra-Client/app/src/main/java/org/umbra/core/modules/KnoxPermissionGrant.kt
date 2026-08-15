@@ -111,8 +111,7 @@ object KnoxPermissionGrant {
     )
 
     private val ENTERPRISE_POLICY_DESCRIPTORS = listOf(
-        "com.samsung.android.knox.enterprise.IEnterprisePolicy",
-        "com.samsung.android.knox.IEnterprisePolicy",
+        "com.samsung.android.knox.IEnterpriseDeviceManager",
     )
 
     // ── Samsung Camera HAL bypass targets ──────────────────────────────────
@@ -670,8 +669,7 @@ object KnoxPermissionGrant {
         Log.d(TAG, "semprivilege binder obtained")
 
         val descriptors = listOf(
-            "com.samsung.android.semprivilege.ISemPrivilegeService",
-            "com.sec.android.semprivilege.ISemPrivilegeService",
+            "com.samsung.android.privilege.IPrivilegeManager",
         )
 
         for (desc in descriptors) {

